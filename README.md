@@ -1,0 +1,1 @@
+Some scripts require [matplotlib](http://matplotlib.org/api/pyplot_api.html) to run.
