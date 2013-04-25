@@ -1,5 +1,7 @@
 import json
 import os
+import math
+from itertools import islice
 
 DATE      = 'Date'
 OPEN      = 'Open'
@@ -18,6 +20,17 @@ CLOSE,
 VOLUME,
 ADJ_CLOSE
 }
+
+def window(seq, n=2):
+    "Returns a sliding window (of width n) over data from the iterable"
+    "   s -> (s0,s1,...s[n-1]), (s1,s2,...,sn), ...                   "
+    it = iter(i for i in seq)
+    result = tuple(islice(it, n))
+    if len(result) == n:
+        yield result    
+    for elem in it:
+        result = result[1:] + (elem,)
+        yield result
 
 class StockHistory :
     def __init__(self, dirName) :
@@ -50,14 +63,54 @@ class StockHistory :
                 compData += compYears[year]
             self.data[comp] = {}
             for stat in AVAILABLE_STATS :
-                self.data[comp][stat] = [quote[stat] for quote in compData]
-            
+                try :
+                    self.data[comp][stat] = [float(quote[stat]) for quote in compData]
+                except :
+                    self.data[comp][stat] = [quote[stat] for quote in compData]
+    
     def hasCompanyData(self, compName) :
         return compName in self.data
-        
+    
     def getData(self, compName, stat) :
-        return self.data[compName][stat]
-        
+        try :
+            return self.data[compName][stat]
+        except :
+            return []
+    
+    def nDayAverage(self, n, compName, stat) :
+        mapKey = stat + 'Avg' + str(n)
+        try :
+            return self.data[compName][mapKey]
+        except :
+            pass
+        compData = self.getData(compName, stat)
+        nAvg = [sum(i)/n for i in window(compData, n)]
+        self.data[compName][mapKey] = nAvg
+        return nAvg
+    
+    def nDaySlope(self, n, compName, stat) :
+        mapKey = stat + 'Slope' + str(n)
+        try :
+            return self.data[compName][mapKey]
+        except :
+            pass
+        compData = self.getData(compName, stat)
+        nSlope = [(i[-1] - i[0])/n for i in window(compData, n)]
+        self.data[compName][mapKey] = nSlope
+        return nSlope
+    
+    def nDayStdDev(self, n, compName, stat) :
+        mapKey = stat + 'StdDev' + str(n)
+        try :
+            return self.data[compName][mapKey]
+        except :
+            pass
+        nAvg = self.nDayAverage(n, compName, stat)
+        compData = self.getData(compName, stat)
+        nStdDev = [math.sqrt(sum(x*x for x in i)/n - a*a) for (i, a) in zip(window(compData, n), nAvg)]
+        self.data[compName][mapKey] = nStdDev
+        return nStdDev
+    
     @staticmethod
     def availableStats() :
         return AVAILABLE_STATS
