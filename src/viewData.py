@@ -1,27 +1,29 @@
 #!/usr/local/bin/python
 
 import sys
-from core.util import data
+from core.util.data import StockHistory
 from core.util.graphics import plot
 
-companiesToGraph = sys.argv[1:]
-stockHistory = data.StockHistory('nasdaq100')
+companyToGraph = sys.argv[1]
+statToGraph = sys.argv[2]
 
-if len(companiesToGraph) > 0 :
-    print 'Generating graphs.'
-for compName in companiesToGraph :
-    compName = compName.upper()
-    if not stockHistory.hasCompanyData(compName) :
-        print 'No data for company', compName
-        continue
-    openYs = stockHistory.getData(compName, data.OPEN)
-    highYs = stockHistory.getData(compName, data.HIGH)
-    lowYs = stockHistory.getData(compName, data.LOW)
-    closeYs = stockHistory.getData(compName, data.CLOSE)
-    plot([openYs, highYs, lowYs, closeYs],
-        labels=['Open', 'High', 'Low', 'Close'],
-        title=compName,
-        xlabel='Time',
-        ylabel='Stock Price')
+print 'Generating graph.'
+
+stockHistory = StockHistory('nasdaq100')
+avg100 = stockHistory.nDayAverage(100, companyToGraph, statToGraph)
+slope100 = stockHistory.nDaySlope(100, companyToGraph, statToGraph)
+stddev100 = stockHistory.nDayStdDev(100, companyToGraph, statToGraph)
+
+avg10 = stockHistory.nDayAverage(10, companyToGraph, statToGraph)
+slope10 = stockHistory.nDaySlope(10, companyToGraph, statToGraph)
+stddev10 = stockHistory.nDayStdDev(10, companyToGraph, statToGraph)
+
+print '\n'.join(str(i) for i in zip(stockHistory.getData(companyToGraph, statToGraph)[100:], avg100, stddev100, slope100, avg10, slope10, stddev10))
+
+print 'Generating graphs'
+
+plot([avg100, stockHistory.getData(companyToGraph, statToGraph)], yerrs=[stddev100, None])
+plot([avg10, stockHistory.getData(companyToGraph, statToGraph)], yerrs=[stddev10, None])
+plot([slope100, slope10])
 
 print 'Done.'

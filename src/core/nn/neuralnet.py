@@ -13,7 +13,9 @@ avg10 = stockHistory.nDayAverage(10, 'GOOG', 'Open')
 slope10 = stockHistory.nDaySlope(10, 'GOOG', 'Open')
 stddev10 = stockHistory.nDayStdDev(10, 'GOOG', 'Open')
 
-print '\n'.join(str(i) for i in zip(stockHistory.getData('GOOG', 'Open')[100:], avg100, stddev100, slope100))
+print '\n'.join(str(i) for i in zip(stockHistory.getData('GOOG', 'Open')[100:], avg100, stddev100, slope100, avg10, slope10, stddev10))
 
-plot([avg100, stockHistory.getData('GOOG', 'Open')])
-plot([avg10, stockHistory.getData('GOOG', 'Open')])
+plot([avg100, stockHistory.getData('GOOG', 'Open')], yerrs=[stddev100, None])
+plot([avg10, stockHistory.getData('GOOG', 'Open')], yerrs=[stddev10, None])
+
+plot([slope100, slope10])
