@@ -27,19 +27,19 @@ def window(seq, n=2):
     it = iter(i for i in seq)
     result = tuple(islice(it, n))
     if len(result) == n:
-        yield result    
+        yield result
     for elem in it:
         result = result[1:] + (elem,)
         yield result
 
 class StockHistory :
     def __init__(self, dirName) :
-        path = os.path.dirname(os.path.realpath(__file__)) + '/../data/' + dirName
-        files = [f for f in os.listdir(path) if 'json' in f]
+        self.path = os.path.dirname(os.path.realpath(__file__)) + '/../../../data/' + dirName
+        files = [f for f in os.listdir(self.path) if 'json' in f]
         print 'Reading files in', dirName
         companyStockHistory = {}
         for fName in files :
-            f = open(path + '/' + fName, 'r')
+            f = open(self.path + '/' + fName, 'r')
             try :
                 quotes = json.loads(f.read())['query']['results']['quote']
             except :
