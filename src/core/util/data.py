@@ -1,6 +1,7 @@
 import json
 import os
 import math
+from datetime import date
 from itertools import islice
 
 DATE      = 'Date'
@@ -8,7 +9,7 @@ OPEN      = 'Open'
 HIGH      = 'High'
 LOW       = 'Low'
 CLOSE     = 'Close'
-VOLUME    = 'Volume' 
+VOLUME    = 'Volume'
 ADJ_CLOSE = 'Adj_Close'
 
 AVAILABLE_STATS = {
@@ -76,6 +77,22 @@ class StockHistory :
             return self.data[compName][stat]
         except :
             return []
+            
+    def getAveragePrices(self, compName) :
+        highs = self.getData(compName, HIGH)
+        lows = self.getData(compName, LOW)
+        return [(h+l)/2. for (h,l) in zip(highs, lows)]
+            
+    def getDates(self, compName) :
+        data = self.getData(compName, DATE)
+        dates = []
+        for d in data :
+            ymd = [int(i) for i in d.split('-')]
+            dates.append(date(*ymd))
+        return dates
+    
+    def compNames(self) :
+        return self.data.keys()
     
     def nDayAverage(self, n, compName, stat) :
         mapKey = stat + 'Avg' + str(n)
@@ -114,3 +131,50 @@ class StockHistory :
     @staticmethod
     def availableStats() :
         return AVAILABLE_STATS
+        
+class TrainingSet :
+    numFeatures = 5
+    numTargetFeatures = 2
+    def __init__(self, stockHistory, company) :
+        self.pos = 0
+        self.dates = stockHistory.getDates(company)[100:]
+        self.averages = stockHistory.getAveragePrices(company)[100:]
+        self.numExamples = len(self.dates) - 1
+        stockHistory.nDayAverage(10, company, OPEN)[90:]
+        stockHistory.nDayAverage(10, company, HIGH)[90:]
+        stockHistory.nDayAverage(10, company, LOW)[90:]
+        stockHistory.nDayAverage(10, company, CLOSE)[90:]
+        stockHistory.nDayAverage(10, company, VOLUME)[90:]
+    
+    def __iter__(self) :
+        return self
+        
+    def next(self) :
+        if self.pos >= self.numExamples:
+            raise StopIteration
+        example = TrainingExample()
+        # Add features for Monday thru Friday
+        date = self.dates[self.pos].weekday()
+        for i in range(5) :
+            if i == date :
+                example.addFeature(1)
+            else :
+                example.addFeature(0)
+        example.addOutput(self.averages[self.pos] > self.averages[self.pos+1])
+        example.addOutput(self.averages[self.pos] < self.averages[self.pos+1])
+        self.pos += 1
+        return example
+        
+class TrainingExample :
+    def __init__(self) :
+        self.features = []
+        self.output = []
+        
+    def addFeature(self, f) :
+        self.features.append(self.boolToInt(f))
+        
+    def addOutput(self, o) :
+        self.output.append(self.boolToInt(o))
+        
+    def boolToInt(self, b) :
+        return 1 if b else 0
