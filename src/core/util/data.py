@@ -84,11 +84,17 @@ class StockHistory :
         return [(h+l)/2. for (h,l) in zip(highs, lows)]
             
     def getDates(self, compName) :
+        mapKey = 'dates'
+        try :
+            return self.data[compName][mapKey]
+        except :
+            pass
         data = self.getData(compName, DATE)
         dates = []
         for d in data :
             ymd = [int(i) for i in d.split('-')]
             dates.append(date(*ymd))
+        self.data[compName][mapKey] = dates
         return dates
     
     def compNames(self) :
@@ -133,18 +139,24 @@ class StockHistory :
         return AVAILABLE_STATS
         
 class TrainingSet :
-    numFeatures = 5
+    numFeatures = 15
     numTargetFeatures = 2
-    def __init__(self, stockHistory, company) :
+    def __init__(self, stockHistory, company, *args) :
         self.pos = 0
         self.dates = stockHistory.getDates(company)[100:]
         self.averages = stockHistory.getAveragePrices(company)[100:]
         self.numExamples = len(self.dates) - 1
-        stockHistory.nDayAverage(10, company, OPEN)[90:]
-        stockHistory.nDayAverage(10, company, HIGH)[90:]
-        stockHistory.nDayAverage(10, company, LOW)[90:]
-        stockHistory.nDayAverage(10, company, CLOSE)[90:]
-        stockHistory.nDayAverage(10, company, VOLUME)[90:]
+        
+        self.slopeFeatures = [stockHistory.nDaySlope(10, company, OPEN)[90:],
+                              stockHistory.nDaySlope(10, company, HIGH)[90:],
+                              stockHistory.nDaySlope(10, company, LOW)[90:],
+                              stockHistory.nDaySlope(10, company, CLOSE)[90:],
+                              stockHistory.nDaySlope(10, company, VOLUME)[90:],
+                              stockHistory.nDaySlope(100, company, OPEN),
+                              stockHistory.nDaySlope(100, company, HIGH),
+                              stockHistory.nDaySlope(100, company, LOW),
+                              stockHistory.nDaySlope(100, company, CLOSE),
+                              stockHistory.nDaySlope(100, company, VOLUME)]
     
     def __iter__(self) :
         return self
@@ -160,6 +172,8 @@ class TrainingSet :
                 example.addFeature(1)
             else :
                 example.addFeature(0)
+        for sFeature in self.slopeFeatures :
+            example.addFeature(sFeature[self.pos] > 1)
         example.addOutput(self.averages[self.pos] > self.averages[self.pos+1])
         example.addOutput(self.averages[self.pos] < self.averages[self.pos+1])
         self.pos += 1
