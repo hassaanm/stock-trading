@@ -4,8 +4,9 @@ import sys
 from core.util import data
 from core.util.graphics import plot
 
-companiesToGraph = sys.argv[1:]
-stockHistory = data.StockHistory('nasdaq100')
+dataSet = sys.argv[1]
+companiesToGraph = sys.argv[2:]
+stockHistory = data.StockHistory(dataSet)
 
 if len(companiesToGraph) > 0 :
     print 'Generating graphs.'

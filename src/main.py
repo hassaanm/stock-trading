@@ -4,7 +4,7 @@ from core.nn.neuralnet import trainNN
 import sys
 
 def main() :
-    if len(sys.argv) < 3 :
+    if len(sys.argv) < 2 :
         usage()
         sys.exit(0)
     if sys.argv[1] == 'nn' :

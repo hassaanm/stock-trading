@@ -2,7 +2,7 @@ import json
 import os
 import math
 from datetime import date
-from itertools import islice
+from itertools import islice, chain
 
 DATE      = 'Date'
 OPEN      = 'Open'
@@ -34,6 +34,7 @@ def window(seq, n=2):
         yield result
 
 class StockHistory :
+    stats = AVAILABLE_STATS
     def __init__(self, dirName) :
         self.path = os.path.dirname(os.path.realpath(__file__)) + '/../../../data/' + dirName
         files = [f for f in os.listdir(self.path) if 'json' in f]
@@ -75,19 +76,26 @@ class StockHistory :
     def getData(self, compName, stat) :
         try :
             return self.data[compName][stat]
-        except :
+        except KeyError:
             return []
             
     def getAveragePrices(self, compName) :
+        mapKey = 'avgPrice'
+        try :
+            return self.data[compName][mapKey]
+        except KeyError:
+            pass
         highs = self.getData(compName, HIGH)
         lows = self.getData(compName, LOW)
-        return [(h+l)/2. for (h,l) in zip(highs, lows)]
+        avgPrices = [(h+l)/2. for (h,l) in zip(highs, lows)]
+        self.data[compName][mapKey] = avgPrices
+        return avgPrices
             
     def getDates(self, compName) :
         mapKey = 'dates'
         try :
             return self.data[compName][mapKey]
-        except :
+        except KeyError:
             pass
         data = self.getData(compName, DATE)
         dates = []
@@ -104,7 +112,7 @@ class StockHistory :
         mapKey = stat + 'Avg' + str(n)
         try :
             return self.data[compName][mapKey]
-        except :
+        except KeyError:
             pass
         compData = self.getData(compName, stat)
         nAvg = [sum(i)/n for i in window(compData, n)]
@@ -115,7 +123,7 @@ class StockHistory :
         mapKey = stat + 'Slope' + str(n)
         try :
             return self.data[compName][mapKey]
-        except :
+        except KeyError:
             pass
         compData = self.getData(compName, stat)
         nSlope = [(i[-1] - i[0])/n for i in window(compData, n)]
@@ -126,37 +134,76 @@ class StockHistory :
         mapKey = stat + 'StdDev' + str(n)
         try :
             return self.data[compName][mapKey]
-        except :
+        except KeyError:
             pass
         nAvg = self.nDayAverage(n, compName, stat)
         compData = self.getData(compName, stat)
         nStdDev = [math.sqrt(sum(x*x for x in i)/n - a*a) for (i, a) in zip(window(compData, n), nAvg)]
         self.data[compName][mapKey] = nStdDev
         return nStdDev
-    
-    @staticmethod
-    def availableStats() :
-        return AVAILABLE_STATS
+
+class Featurizer :
+    outFeatures = 2
+    baseFeatures = 5
+    statFeatures = 2
+    def __init__(self, stockHistory, *args) :
+        self.parseArgs(args)
+        self.numFeatures = Featurizer.baseFeatures + len(self.statsToUse) * Featurizer.statFeatures
+        self.numTargetFeatures = Featurizer.outFeatures
+        self.stockHistory = stockHistory
         
-class TrainingSet :
-    numFeatures = 15
-    numTargetFeatures = 2
-    def __init__(self, stockHistory, company, *args) :
-        self.pos = 0
-        self.dates = stockHistory.getDates(company)[100:]
-        self.averages = stockHistory.getAveragePrices(company)[100:]
+    def setCompany(self, company) :
+        self.dates = self.stockHistory.getDates(company)[100:]
         self.numExamples = len(self.dates) - 1
-        
-        self.slopeFeatures = [stockHistory.nDaySlope(10, company, OPEN)[90:],
-                              stockHistory.nDaySlope(10, company, HIGH)[90:],
-                              stockHistory.nDaySlope(10, company, LOW)[90:],
-                              stockHistory.nDaySlope(10, company, CLOSE)[90:],
-                              stockHistory.nDaySlope(10, company, VOLUME)[90:],
-                              stockHistory.nDaySlope(100, company, OPEN),
-                              stockHistory.nDaySlope(100, company, HIGH),
-                              stockHistory.nDaySlope(100, company, LOW),
-                              stockHistory.nDaySlope(100, company, CLOSE),
-                              stockHistory.nDaySlope(100, company, VOLUME)]
+        self.averages = self.stockHistory.getAveragePrices(company)[100:]
+        self.slopeFeatures = list(chain.from_iterable((
+                                self.stockHistory.nDaySlope(10, company, stat)[90:],
+                                self.stockHistory.nDaySlope(100, company, stat)
+                              ) for stat in self.statsToUse))
+    
+    def features(self, pos) :
+        example = TrainingExample()
+        # Add features for Monday thru Friday
+        date = self.dates[pos].weekday()
+        for i in range(5) :
+            if i == date :
+                example.addFeature(1)
+            else :
+                example.addFeature(0)
+        for sFeature in self.slopeFeatures :
+            example.addFeature(sFeature[pos] > 1)
+        example.addOutput(self.averages[pos] > self.averages[pos+1])
+        example.addOutput(self.averages[pos] < self.averages[pos+1])
+        return example
+    
+    def parseArgs(self, args) :
+        self.statsToUse = []
+        for i in range(len(args)) :
+            arg = args[i]
+            if i == 0 :
+                for char in arg.lower() :
+                    if char == 'o' :
+                        self.statsToUse.append(OPEN)
+                    elif char == 'h' :
+                        self.statsToUse.append(HIGH)
+                    elif char == 'l' :
+                        self.statsToUse.append(LOW)
+                    elif char == 'c' :
+                        self.statsToUse.append(CLOSE)
+                    elif char == 'v' :
+                        self.statsToUse.append(VOLUME)
+            if i == 1 :
+                break # no more args
+        if len(args) == 0 :
+            self.statsToUse = [OPEN, HIGH, LOW, CLOSE, VOLUME]
+        print 'Using stats:', self.statsToUse
+
+class TrainingSet :
+    def __init__(self, featurizer, company) :
+        self.pos = 0
+        featurizer.setCompany(company)
+        self.numExamples = featurizer.numExamples
+        self.featurizer = featurizer
     
     def __iter__(self) :
         return self
@@ -164,18 +211,7 @@ class TrainingSet :
     def next(self) :
         if self.pos >= self.numExamples:
             raise StopIteration
-        example = TrainingExample()
-        # Add features for Monday thru Friday
-        date = self.dates[self.pos].weekday()
-        for i in range(5) :
-            if i == date :
-                example.addFeature(1)
-            else :
-                example.addFeature(0)
-        for sFeature in self.slopeFeatures :
-            example.addFeature(sFeature[self.pos] > 1)
-        example.addOutput(self.averages[self.pos] > self.averages[self.pos+1])
-        example.addOutput(self.averages[self.pos] < self.averages[self.pos+1])
+        example = self.featurizer.features(self.pos)
         self.pos += 1
         return example
         

@@ -1,4 +1,4 @@
-from core.util.data import StockHistory, TrainingSet
+from core.util.data import StockHistory, TrainingSet, Featurizer
 from core.util.graphics import plot
 from core.util.util import Writer
 from pybrain.datasets import SupervisedDataSet
@@ -7,14 +7,15 @@ from pybrain.supervised.trainers import BackpropTrainer
 from pybrain.tools.shortcuts import buildNetwork
 from time import time
 
-def trainNN(*args) :
+def trainNN(args) :
     print 'Begin training Neural Network'
     print
     print 'Reading data'
     stockHistory = StockHistory('nasdaq100')
     companies = stockHistory.compNames()
-    nF = TrainingSet.numFeatures
-    nO = TrainingSet.numTargetFeatures
+    featurizer = Featurizer(stockHistory, *args)
+    nF = featurizer.numFeatures
+    nO = featurizer.numTargetFeatures
     print
     
     print 'Using', str(nF), 'input features with', str(nO), 'output features'
@@ -25,7 +26,7 @@ def trainNN(*args) :
     correlations = [[0 for i in range(nO)] for j in range(nF)]
     numTrainingExamples = 0
     for company in companies :
-        trainingSet = TrainingSet(stockHistory, company, *args)
+        trainingSet = TrainingSet(featurizer, company)
         for trainingExample in trainingSet :
             features = trainingExample.features
             output = trainingExample.output
@@ -45,10 +46,10 @@ def trainNN(*args) :
     print 'i, Percent with feature, Correlation with output:'
     for i in range(len(correlations)):
         fs = float(featureStats[i])/numTrainingExamples
-        print i, '\t', fs, '     \t', [float(c) for c in correlations[i]]
+        print i, '\t', fs, '     \t', [float(c)/numTrainingExamples for c in correlations[i]]
     print
     print 'Building network'
-    netStructure = [nF, nF, nF*3/4, nF/2, nF/4, nO]
+    netStructure = [nF, nF, nF, nO]
     net = buildNetwork(*netStructure, bias=True, hiddenclass=TanhLayer)
     trainer = BackpropTrainer(net, ds, verbose=True)
     print 'Training'

@@ -1,6 +1,14 @@
-import matplotlib.pyplot as plt
+graphing = False
+try :
+    import matplotlib.pyplot as plt
+    graphing = True
+except :
+    pass
 
 def plot(yss, xss=None, labels=None, yerrs=None, title='', xlabel='', ylabel='', legendLoc=4, right=True) :
+    if not graphing :
+        print 'Graphing is not available'
+        return
     if labels == None :
         labels = [str(i) for i in range(len(yss))]
     if yerrs != None :
