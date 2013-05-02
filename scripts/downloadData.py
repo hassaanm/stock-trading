@@ -40,7 +40,7 @@ with open(csvFile, 'r') as f :
     fileContents = csv.reader(f)
     for line in fileContents :
         fileLines.append(line)
-header = {name.lower():i for (i, name) in enumerate(fileLines[0])}
+header = dict((name.lower(),i) for (i, name) in enumerate(fileLines[0]))
 data = fileLines[1:]
 
 companies = [row[header['name']].rstrip() for row in data]
