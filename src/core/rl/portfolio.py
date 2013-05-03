@@ -30,6 +30,8 @@ class Portfolio(object):
         count = 0
         realMoney = 10000
         randomMoney = 10000
+        avgMoney = 10000
+        bestMoney = 10000
         # loop until out of training data
         while flag:
             # get features and rewards
@@ -46,13 +48,18 @@ class Portfolio(object):
             flag = len(trainingSets.keys()) != 0
             # call LinUCB
             if flag:
-                stocks, stockReturn, randomReturn, sharpeRatio = self.LinUCB(self.companies, features, rewards, self.numToPick)
-                print stockReturn, randomReturn, sharpeRatio, stocks
+                stocks, stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio = self.LinUCB(self.companies, features, rewards, self.numToPick)
+                print stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio, stocks
                 count += 1
                 if count > 1000:
                     realMoney = realMoney + realMoney * stockReturn if realMoney > 0 else 0
                     randomMoney = randomMoney + randomMoney * randomReturn if randomMoney > 0 else 0
-        print count, realMoney, randomMoney
+                    avgMoney = avgMoney + avgMoney * avgReturn if avgMoney > 0 else 0
+                    bestMoney = bestMoney + bestMoney * bestReturn if bestMoney > 0 else 0
+        print ('%-14s %14.2f') % ('Real Money:', realMoney)
+        print ('%-14s %14.2f') % ('Random Money:', randomMoney)
+        print ('%-14s %14.2f') % ('Average Money:', avgMoney)
+        print ('%-14s %14.2f') % ('Best Money:', bestMoney)
 
     def LinUCB(self, stocks, features, rewards, numberOfStocksToPick):
         p = []
@@ -92,9 +99,12 @@ class Portfolio(object):
         #    self.A[stock] += numpy.dot(x, x.T)
         #    self.b[stock] += sharpeRatio * x.T
 
-        chosenStocks, chosenFeatures, chosenRewards = zip(*chosen)
+        avgReturn = sum(rewards) / len(rewards)
+        rewards.sort()
+        bestReturn = sum(rewards[::-1][:numberOfStocksToPick])
 
-        return chosenStocks, (stockReturn/numberOfStocksToPick), (randomReturn/numberOfStocksToPick), sharpeRatio
+        chosenStocks, chosenFeatures, chosenRewards = zip(*chosen)
+        return chosenStocks, (stockReturn/numberOfStocksToPick), (randomReturn/numberOfStocksToPick), avgReturn, (bestReturn/numberOfStocksToPick), sharpeRatio
 
 def runPortfolio():
     portfolio = Portfolio(5)
