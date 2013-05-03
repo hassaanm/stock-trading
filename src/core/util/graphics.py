@@ -35,3 +35,16 @@ def plot(yss, xss=None, labels=None, yerrs=None, title='', xlabel='', ylabel='',
         ax.plot(xs, ys, label=l)
     ax.legend(loc=legendLoc)
     plt.show()
+    
+def plotDistribution(values, chop, r) :
+    graphVals = {}
+    for v in values :
+        rv = round(v, r)
+        if rv in graphVals :
+            graphVals[rv] += 1
+        else :
+            graphVals[rv] = 1
+    xs = sorted(graphVals.keys())[:chop]
+    ys = [graphVals[x] for x in xs]
+    print zip(xs, ys)
+    plot([ys], [xs])
