@@ -1,6 +1,5 @@
 import json
 import os
-import math
 from datetime import date
 from itertools import islice, chain
 
@@ -138,9 +137,21 @@ class StockHistory :
             pass
         nAvg = self.nDayAverage(n, compName, stat)
         compData = self.getData(compName, stat)
-        nStdDev = [math.sqrt(sum(x*x for x in i)/n - a*a) for (i, a) in zip(window(compData, n), nAvg)]
+        nStdDev = [sum((x-a)**2 for x in i)**.5 for (i, a) in zip(window(compData, n), nAvg)]
         self.data[compName][mapKey] = nStdDev
         return nStdDev
+        
+    def nDaySharpeRatio(self, n, compName, stat) :
+        mapKey = stat + 'Sharpe' + str(n)
+        try :
+            return self.data[compName][mapKey]
+        except KeyError:
+            pass
+        nAvg = self.nDayAverage(n, compName, stat)
+        nStdDev = self.nDayStdDev(n, compName, stat)
+        nSharpe = [(a/s if s != 0 else 0) for (a,s) in zip(nAvg, nStdDev)]
+        self.data[compName][mapKey] = nSharpe
+        return nSharpe
 
 class Featurizer :
     outFeatures = 2

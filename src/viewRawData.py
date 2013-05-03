@@ -2,7 +2,7 @@
 
 import sys
 from core.util import data
-from core.util.graphics import plot
+from core.util.graphics import plot, plotDistribution
 
 dataSet = sys.argv[1]
 companiesToGraph = sys.argv[2:]
@@ -24,5 +24,9 @@ for compName in companiesToGraph :
         title=compName,
         xlabel='Time',
         ylabel='Stock Price')
+sharpeRatios = []
+for comp in stockHistory.compNames() :
+    sharpeRatios += stockHistory.nDaySharpeRatio(3, comp, data.OPEN)
+plotDistribution(sharpeRatios)
 
 print 'Done.'

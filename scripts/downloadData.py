@@ -43,8 +43,12 @@ with open(csvFile, 'r') as f :
 header = dict((name.lower(),i) for (i, name) in enumerate(fileLines[0]))
 data = fileLines[1:]
 
-companies = [row[header['name']].rstrip() for row in data]
-symbols = [row[header['symbol']].rstrip() for row in data]
+def fixSymbol(symbol) :
+    if '/' in symbol :
+        symbol = symbol.split('/')[0]
+    return symbol.replace('^', '-P').rstrip()
+
+symbols = list(set(fixSymbol(row[header['symbol']]) for row in data))
 
 # download data and write to files
 for sym in symbols :
