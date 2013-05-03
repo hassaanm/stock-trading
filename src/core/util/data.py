@@ -169,14 +169,15 @@ class Featurizer :
     outFeatures = 2
     baseFeatures = 10
     statFeatures = 4
+    numDaysOfHistory = 5
     def __init__(self, stockHistory, *args) :
         self.parseArgs(args)
         self.numFeatures = Featurizer.baseFeatures + len(self.statsToUse) * Featurizer.statFeatures
         self.numTargetFeatures = Featurizer.outFeatures
         self.stockHistory = stockHistory
-        self.cut = max(self.N, 5)
-        self.returnCut = self.cut - 5
-        self.nDayCut = 0 if self.returnCut > 0 else (5-self.N)
+        self.cut = max(self.N, Featurizer.numDaysOfHistory)
+        self.returnCut = self.cut - Featurizer.numDaysOfHistory
+        self.nDayCut = 0 if self.returnCut > 0 else (Featurizer.numDaysOfHistory-self.N)
         
     def setCompany(self, company) :
         self.dates = self.stockHistory.getDates(company)[self.cut:]
@@ -188,14 +189,15 @@ class Featurizer :
     def features(self, pos) :
         example = TrainingExample()
         date = self.dates[pos].weekday()
+        # Add features for Monday thru Friday
         for i in range(5) :
-            # Add features for previous five days
-            example.addFeature(self.returns[pos + i] > 0)
-            # Add features for Monday thru Friday
             if i == date :
                 example.addFeature(1)
             else :
                 example.addFeature(0)
+        # Add features for previous numDaysOfHistory days
+        for i in range(Featurizer.numDaysOfHistory) :
+            example.addFeature(self.returns[pos + i] > 0)
         for sFeature in self.slopeFeatures :
             example.addFeature(sFeature[pos] > 0)
             example.addFeature(sFeature[pos] < 0)
