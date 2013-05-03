@@ -1,6 +1,6 @@
 from core.util.data import StockHistory, TrainingSet, Featurizer
 from core.util.graphics import plot
-from core.util.util import Writer
+import pickle
 from pybrain.datasets import SupervisedDataSet
 from pybrain.structure import TanhLayer
 from pybrain.supervised.trainers import BackpropTrainer
@@ -54,12 +54,10 @@ def trainNN(args) :
     trainer = BackpropTrainer(net, ds, verbose=True)
     print 'Training'
     start = time()
-    errorsPerEpoch = trainer.trainUntilConvergence(maxEpochs=2)
+    errorsPerEpoch = trainer.trainUntilConvergence(maxEpochs=50)
     end = time()
     print 'Training time:', (end - start)
-    print
-    print 'Graphing errors during training'
-    plot(errorsPerEpoch)
+    print errorsPerEpoch
     print
     for mod in net.modules:
         print "Module:", mod.name
@@ -71,9 +69,17 @@ def trainNN(args) :
                 print "- parameters", conn.params
         if hasattr(net, "recurrentConns"):
             print "Recurrent connections"
-            for conn in net.recurrentConns:             
+            for conn in net.recurrentConns:
                 print "-", conn.inmod.name, " to", conn.outmod.name
                 if conn.paramdim > 0:
                     print "- parameters", conn.params
+    f = open('.'.join(['nn']+args+['dat']), 'w')
+    pickle.dump(net, f)
+    f.close()
+    print
+    print 'Graphing errors during training'
+    try:
+        plot(errorsPerEpoch)
+    except:
+        pass
     return net
-    
