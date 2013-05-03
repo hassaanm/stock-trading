@@ -1,5 +1,7 @@
 __author__ = 'Daan Wierstra and Tom Schaul'
 
+import pickle
+
 from scipy import dot, argmax
 from random import shuffle
 
@@ -184,7 +186,7 @@ class BackpropTrainer(Trainer):
             return out
 
     def trainUntilConvergence(self, dataset=None, maxEpochs=None, verbose=None,
-                              continueEpochs=10, validationProportion=0.25):
+                              continueEpochs=10, validationProportion=0.25, outFile=None):
         """Train the module on the dataset until it converges.
 
         Return the module with the parameters that gave the minimal validation
@@ -226,6 +228,14 @@ class BackpropTrainer(Trainer):
                 self.module.params[:] = bestweights
                 break
             epochs += 1
+            if outFile != None :
+                pfile = open(outFile + '.net', 'w')
+                pickle.dump(self.module, pfile)
+                f = open(outFile, 'a')
+                f.write(str(epochs) + '\n')
+                f.write('train-errors:' + fListToString(trainingErrors, 6) + '\n')
+                f.write('valid-errors:' + fListToString(validationErrors, 6) + '\n')
+                f.close()
 
             if len(validationErrors) >= continueEpochs * 2:
                 # have the validation errors started going up again?
