@@ -12,7 +12,7 @@ CLOSE     = 'Close'
 VOLUME    = 'Volume'
 ADJ_CLOSE = 'Adj_Close'
 
-AVAILABLE_STATS = {
+AVAILABLE_STATS = [
 DATE,
 OPEN,
 HIGH,
@@ -20,7 +20,7 @@ LOW,
 CLOSE,
 VOLUME,
 ADJ_CLOSE
-}
+]
 
 def window(seq, n=2):
     "Returns a sliding window (of width n) over data from the iterable"
