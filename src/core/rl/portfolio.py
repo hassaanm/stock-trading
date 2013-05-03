@@ -6,7 +6,7 @@ from core.util.data import StockHistory, TrainingSet, Featurizer
 
 class Portfolio(object):
 
-    def __init__(self, pickNum):
+    def __init__(self, pickNum, testSize, money):
         self.stockHistory = StockHistory('nasdaq100')
         self.companies = self.stockHistory.compNames()
         self.featurizer = Featurizer(self.stockHistory)
@@ -15,7 +15,14 @@ class Portfolio(object):
         self.b = dict()
         self.alpha = 1
         self.numToPick = pickNum
+        self.testPercentage = testSize
+        self.startMoney = money
         self.numberOfFeatures = self.featurizer.numFeatures
+
+    def CAGR(self, endMoney, years):
+        totalReturn = endMoney / float(self.startMoney)
+        CAGR = totalReturn ** (1 / float(years))
+        return ((CAGR - 1) * 100)
 
     def run(self):
         # get data
@@ -24,14 +31,18 @@ class Portfolio(object):
         for company in self.companies:
             trainingSets[company] = TrainingSet(self.featurizer, company)
             returns[company] = iter(self.stockHistory.getReturns(company)[self.featurizer.cut:])
+        testSet = 0
+        for trainingExample in TrainingSet(self.featurizer, self.companies[0]):
+            testSet += 1
+        testSet = int(testSet * (1 - self.testPercentage))
 
         # run LinUCB
         flag = True
         count = 0
-        realMoney = 10000
-        randomMoney = 10000
-        avgMoney = 10000
-        bestMoney = 10000
+        realMoney = self.startMoney
+        randomMoney = self.startMoney
+        avgMoney = self.startMoney
+        bestMoney = self.startMoney
         # loop until out of training data
         while flag:
             # get features and rewards
@@ -51,15 +62,17 @@ class Portfolio(object):
                 stocks, stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio = self.LinUCB(self.companies, features, rewards, self.numToPick)
                 print stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio, stocks
                 count += 1
-                if count > 1000:
+                if count > testSet:
                     realMoney = realMoney + realMoney * stockReturn if realMoney > 0 else 0
                     randomMoney = randomMoney + randomMoney * randomReturn if randomMoney > 0 else 0
                     avgMoney = avgMoney + avgMoney * avgReturn if avgMoney > 0 else 0
                     bestMoney = bestMoney + bestMoney * bestReturn if bestMoney > 0 else 0
-        print ('%-14s %14.2f') % ('Real Money:', realMoney)
-        print ('%-14s %14.2f') % ('Random Money:', randomMoney)
-        print ('%-14s %14.2f') % ('Average Money:', avgMoney)
-        print ('%-14s %14.2f') % ('Best Money:', bestMoney)
+
+        print 'Training days:', testSet, 'Testing days:', (count - testSet), 'Total days:', count
+        print ('%-14s %14f %2.2f') % ('Real Money:', realMoney, self.CAGR(realMoney, (count - testSet) / 250.8))
+        print ('%-14s %14f %2.2f') % ('Random Money:', randomMoney, self.CAGR(randomMoney, (count - testSet) / 250.8))
+        print ('%-14s %14f %2.2f') % ('Average Money:', avgMoney, self.CAGR(avgMoney, (count - testSet) / 250.8))
+        print ('%-14s %14f %2.2f') % ('Best Money:', bestMoney, self.CAGR(bestMoney, (count - testSet) / 250.8))
 
     def LinUCB(self, stocks, features, rewards, numberOfStocksToPick):
         p = []
@@ -92,6 +105,7 @@ class Portfolio(object):
             sharpeRatio += (reward - avgReturn)**2
 
         sharpeRatio = (sharpeRatio / float(numberOfStocksToPick))**0.5
+        sharpeRatio = avgReturn / sharpeRatio
 
         # sharpe ratio reward
         #for stock, feature, reward in chosen:
@@ -106,6 +120,6 @@ class Portfolio(object):
         chosenStocks, chosenFeatures, chosenRewards = zip(*chosen)
         return chosenStocks, (stockReturn/numberOfStocksToPick), (randomReturn/numberOfStocksToPick), avgReturn, (bestReturn/numberOfStocksToPick), sharpeRatio
 
-def runPortfolio():
-    portfolio = Portfolio(5)
+def runPortfolio(numOfStocks, testPercentage, money):
+    portfolio = Portfolio(numOfStocks, testPercentage, money)
     portfolio.run()
