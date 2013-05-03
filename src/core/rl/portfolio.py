@@ -1,13 +1,25 @@
 import math
 import numpy
 
+from core.util.data import StockHistory, TrainingSet, Featurizer
+
 class Portfolio(object):
 
     def __init__(self):
+        self.stockHistory = StockHistory('nasdaq100')
+        self.companies = self.stockHistory.compNames()
+        self.featurizer = Featurizer(self.stockHistory)
+
         self.A = dict()
         self.b = dict()
         self.alpha = 1
-        self.numberOfFeatures = 10
+        self.numberOfFeatures = self.featurizer.numFeatures
+
+    def run():
+        for company in self.companies:
+            trainingSet = TrainingSet(self.featurizer, company)
+            for trainingExample in trainingSet:
+                features = trainingExample.features
 
     # TODO: return feature vector for stock on date
     def getFeatures(self, stockSymbol, date):
@@ -41,3 +53,6 @@ class Portfolio(object):
             self.b[stock] += self.getReward(stock, date) * x.T
 
         return chosenStocks
+
+def runPortfolio():
+    portfolio = Portfolio()
