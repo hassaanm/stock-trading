@@ -78,5 +78,8 @@ def trainNN(args) :
     f.close()
     print
     print 'Graphing errors during training'
-    plot(errorsPerEpoch)
+    try:
+        plot(errorsPerEpoch)
+    except:
+        pass
     return net
