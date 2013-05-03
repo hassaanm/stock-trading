@@ -6,7 +6,7 @@ from core.util.data import StockHistory, TrainingSet, Featurizer
 
 class Portfolio(object):
 
-    def __init__(self, pickNum, testSize, money):
+    def __init__(self, pickNum, testSize, money, verbose = False):
         self.stockHistory = StockHistory('nasdaq100')
         self.companies = self.stockHistory.compNames()
         self.featurizer = Featurizer(self.stockHistory)
@@ -17,6 +17,7 @@ class Portfolio(object):
         self.numToPick = pickNum
         self.testPercentage = testSize
         self.startMoney = money
+        self.verbose = verbose
         self.numberOfFeatures = self.featurizer.numFeatures
 
     def CAGR(self, endMoney, years):
@@ -60,7 +61,8 @@ class Portfolio(object):
             # call LinUCB
             if flag:
                 stocks, stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio = self.LinUCB(self.companies, features, rewards, self.numToPick)
-                print stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio, stocks
+                if self.verbose:
+                    print stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio, stocks
                 count += 1
                 if count > testSet:
                     realMoney = realMoney + realMoney * stockReturn if realMoney > 0 else 0
@@ -120,6 +122,6 @@ class Portfolio(object):
         chosenStocks, chosenFeatures, chosenRewards = zip(*chosen)
         return chosenStocks, (stockReturn/numberOfStocksToPick), (randomReturn/numberOfStocksToPick), avgReturn, (bestReturn/numberOfStocksToPick), sharpeRatio
 
-def runPortfolio(numOfStocks, testPercentage, money):
-    portfolio = Portfolio(numOfStocks, testPercentage, money)
+def runPortfolio(numOfStocks, testPercentage, money, verbose):
+    portfolio = Portfolio(numOfStocks, testPercentage, money, verbose)
     portfolio.run()
