@@ -103,6 +103,18 @@ class StockHistory :
             dates.append(date(*ymd))
         self.data[compName][mapKey] = dates
         return dates
+        
+    def getReturns(self, compName) :
+        mapKey = 'returns'
+        try :
+            return self.data[compName][mapKey]
+        except KeyError:
+            pass
+        close = self.getData(compName, CLOSE)
+        open = self.getData(compName, OPEN)
+        returns = [(c-o)/o for (c,o) in zip(close,open)]
+        self.data[compName][mapKey] = returns
+        return returns
     
     def compNames(self) :
         return self.data.keys()
@@ -137,7 +149,7 @@ class StockHistory :
             pass
         nAvg = self.nDayAverage(n, compName, stat)
         compData = self.getData(compName, stat)
-        nStdDev = [sum((x-a)**2 for x in i)**.5 for (i, a) in zip(window(compData, n), nAvg)]
+        nStdDev = [sum(((x-a)**2)/n for x in w)**.5 for (w, a) in zip(window(compData, n), nAvg)]
         self.data[compName][mapKey] = nStdDev
         return nStdDev
         
@@ -155,43 +167,59 @@ class StockHistory :
 
 class Featurizer :
     outFeatures = 2
-    baseFeatures = 5
-    statFeatures = 2
+    baseFeatures = 10
+    statFeatures = 4
     def __init__(self, stockHistory, *args) :
         self.parseArgs(args)
         self.numFeatures = Featurizer.baseFeatures + len(self.statsToUse) * Featurizer.statFeatures
         self.numTargetFeatures = Featurizer.outFeatures
         self.stockHistory = stockHistory
+        self.cut = max(self.N, 5)
+        self.returnCut = self.cut - 5
+        self.nDayCut = 0 if self.returnCut > 0 else (5-self.N)
         
     def setCompany(self, company) :
-        self.dates = self.stockHistory.getDates(company)[100:]
+        self.dates = self.stockHistory.getDates(company)[self.cut:]
         self.numExamples = len(self.dates) - 1
-        self.averages = self.stockHistory.getAveragePrices(company)[100:]
-        self.slopeFeatures = list(chain.from_iterable((
-                                self.stockHistory.nDaySlope(10, company, stat)[90:],
-                                self.stockHistory.nDaySlope(100, company, stat)
-                              ) for stat in self.statsToUse))
+        self.averages = self.stockHistory.getAveragePrices(company)[self.cut:]
+        self.returns = self.stockHistory.getReturns(company)[self.returnCut:]
+        self.slopeFeatures = [self.stockHistory.nDaySlope(self.N, company, stat)[self.nDayCut:] for stat in self.statsToUse]
     
     def features(self, pos) :
         example = TrainingExample()
-        # Add features for Monday thru Friday
         date = self.dates[pos].weekday()
         for i in range(5) :
+            # Add features for previous five days
+            example.addFeature(self.returns[pos + i] > 0)
+            # Add features for Monday thru Friday
             if i == date :
                 example.addFeature(1)
             else :
                 example.addFeature(0)
         for sFeature in self.slopeFeatures :
-            example.addFeature(sFeature[pos] > 1)
+            example.addFeature(sFeature[pos] > 0)
+            example.addFeature(sFeature[pos] < 0)
+            example.addFeature(sFeature[pos] > self.slopePos)
+            example.addFeature(sFeature[pos] < self.slopeNeg)
         example.addOutput(self.averages[pos] > self.averages[pos+1])
         example.addOutput(self.averages[pos] < self.averages[pos+1])
         return example
     
     def parseArgs(self, args) :
-        self.statsToUse = []
+        self.statsToUse = [OPEN]
+        self.N = 3
+        self.slopePos = 0.5
+        self.slopeNeg = -0.5
         for i in range(len(args)) :
             arg = args[i]
             if i == 0 :
+                self.N = int(arg)
+            if i == 1 :
+                self.slopePos = float(arg)
+            if i == 2 :
+                self.slopeNeg = float(arg)
+            if i == 3 :
+                self.statsToUse = []
                 for char in arg.lower() :
                     if char == 'o' :
                         self.statsToUse.append(OPEN)
@@ -203,10 +231,11 @@ class Featurizer :
                         self.statsToUse.append(CLOSE)
                     elif char == 'v' :
                         self.statsToUse.append(VOLUME)
-            if i == 1 :
+            if i == 4 :
                 break # no more args
-        if len(args) == 0 :
-            self.statsToUse = [OPEN, HIGH, LOW, CLOSE, VOLUME]
+        print 'N:', self.N
+        print 'slopePos:', self.slopePos
+        print 'slopeNeg:', self.slopeNeg
         print 'Using stats:', self.statsToUse
 
 class TrainingSet :
