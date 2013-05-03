@@ -1,1 +1,8 @@
 *.pyc
+*.dat
+*.info
+*.err
+*.log
+*.out
+*.submit
+*~

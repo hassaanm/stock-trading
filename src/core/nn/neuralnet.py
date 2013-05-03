@@ -33,7 +33,7 @@ def trainNN(args) :
             for i in range(nF) :
                 featureStats[i] += features[i]
                 for j in range(nO) :
-                    if features[i] == output[j] :
+                    if output[j] == 1 and features[i] == output[j] :
                         correlations[i][j] += 1
             for i in range(nO) :
                 outputStats[i] += output[i]
@@ -54,7 +54,7 @@ def trainNN(args) :
     trainer = BackpropTrainer(net, ds, verbose=True)
     print 'Training'
     start = time()
-    errorsPerEpoch = trainer.trainUntilConvergence(maxEpochs=50)
+    errorsPerEpoch = trainer.trainUntilConvergence(outFile='.'.join(['nn']+args+['info']))
     end = time()
     print 'Training time:', (end - start)
     print errorsPerEpoch
@@ -83,3 +83,9 @@ def trainNN(args) :
     except:
         pass
     return net
+    
+def retrainNN(args) :
+    net = pickle.load(args[0])
+    
+def testNN(args) :
+    net = pickle.load(args[0])
