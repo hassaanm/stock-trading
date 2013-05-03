@@ -6,7 +6,7 @@ from core.util.data import StockHistory, TrainingSet, Featurizer
 
 class Portfolio(object):
 
-    def __init__(self):
+    def __init__(self, pickNum):
         self.stockHistory = StockHistory('nasdaq100')
         self.companies = self.stockHistory.compNames()
         self.featurizer = Featurizer(self.stockHistory)
@@ -14,6 +14,7 @@ class Portfolio(object):
         self.A = dict()
         self.b = dict()
         self.alpha = 1
+        self.numToPick = pickNum
         self.numberOfFeatures = self.featurizer.numFeatures
 
     def run(self):
@@ -34,31 +35,37 @@ class Portfolio(object):
             # get features and rewards
             features = []
             rewards = []
-            for company in self.companies:
+            companies = trainingSets.keys()
+            for company in companies:
                 try:
                     features.append(trainingSets[company].next().features)
                     rewards.append(returns[company].next())
                 except:
-                    flag = False
+                    del trainingSets[company]
+                    del returns[company]
+            flag = len(trainingSets.keys()) != 0
             # call LinUCB
-            stocks, stockReturn, randomReturn, sharpeRatio = self.LinUCB(self.companies, features, rewards, 10)
-            print stockReturn, randomReturn, sharpeRatio, stocks
-            count += 1
-            if count > 120:
-                realMoney += realMoney * stockReturn
-                randomMoney += randomMoney * randomReturn
+            if flag:
+                stocks, stockReturn, randomReturn, sharpeRatio = self.LinUCB(self.companies, features, rewards, self.numToPick)
+                print stockReturn, randomReturn, sharpeRatio, stocks
+                count += 1
+                if count > 1000:
+                    realMoney = realMoney + realMoney * stockReturn if realMoney > 0 else 0
+                    randomMoney = randomMoney + randomMoney * randomReturn if randomMoney > 0 else 0
         print count, realMoney, randomMoney
 
     def LinUCB(self, stocks, features, rewards, numberOfStocksToPick):
         p = []
 
-        for stock, feature in zip(stocks, features):
+        for stock, feature, reward in zip(stocks, features, rewards):
             if stock not in self.A:
                 self.A[stock] = numpy.identity(self.numberOfFeatures)
                 self.b[stock] = numpy.zeros(self.numberOfFeatures)
             theta = numpy.dot(numpy.linalg.inv(self.A[stock]), self.b[stock])
             x = numpy.array(feature)
             p.append(float(numpy.dot(theta.T, x) + self.alpha * math.sqrt(numpy.dot(numpy.dot(x.T, numpy.linalg.inv(self.A[stock])), x))))
+            self.A[stock] += numpy.dot(x, x.T)
+            self.b[stock] += reward * x.T
 
         chosen = []
         sortedStocks = numpy.argsort(p)[::-1]
@@ -75,17 +82,20 @@ class Portfolio(object):
         avgReturn = stockReturn / float(numberOfStocksToPick)
         
         for stock, feature, reward in chosen:
-            x = numpy.array(feature)
-            self.A[stock] += numpy.dot(x, x.T)
-            self.b[stock] += reward * x.T
             sharpeRatio += (reward - avgReturn)**2
 
         sharpeRatio = (sharpeRatio / float(numberOfStocksToPick))**0.5
 
-        chosenStocks, chosenFeaturs, chosenRewards = zip(*chosen)
+        # sharpe ratio reward
+        #for stock, feature, reward in chosen:
+        #    x = numpy.array(feature)
+        #    self.A[stock] += numpy.dot(x, x.T)
+        #    self.b[stock] += sharpeRatio * x.T
 
-        return chosenStocks, stockReturn, randomReturn, sharpeRatio
+        chosenStocks, chosenFeatures, chosenRewards = zip(*chosen)
+
+        return chosenStocks, (stockReturn/numberOfStocksToPick), (randomReturn/numberOfStocksToPick), sharpeRatio
 
 def runPortfolio():
-    portfolio = Portfolio()
+    portfolio = Portfolio(5)
     portfolio.run()
