@@ -110,13 +110,13 @@ class Portfolio(object):
             chosen.append((stocks[index], features[index], rewards[index]))
             stockReturn += rewards[index]
 
-        avgReturn = stockReturn / float(numberOfStocksToPick)
+        avgStockReturn = stockReturn / float(numberOfStocksToPick)
         
         for stock, feature, reward in chosen:
-            sharpeRatio += (reward - avgReturn)**2
+            sharpeRatio += (reward - avgStockReturn)**2
 
         sharpeRatio = (sharpeRatio / float(numberOfStocksToPick))**0.5
-        sharpeRatio = avgReturn / sharpeRatio if sharpeRatio != 0 else 0
+        sharpeRatio = avgStockReturn / sharpeRatio if sharpeRatio != 0 else 0
 
         # sharpe ratio reward
         #for stock, feature, reward in chosen:
