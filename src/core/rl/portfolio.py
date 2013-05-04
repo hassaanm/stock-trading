@@ -14,6 +14,7 @@ class Portfolio(object):
         self.A = dict()
         self.b = dict()
         self.alpha = 1
+        self.stockCost = 0
         self.numToPick = pickNum
         self.testPercentage = testSize
         self.startMoney = money
@@ -25,6 +26,19 @@ class Portfolio(object):
         CAGR = totalReturn ** (1 / float(years))
         return ((CAGR - 1) * 100)
 
+    def updateMoney(self, money, stockReturn):
+        cost = self.stockCost * 2 * self.numToPick
+        money = money + money * stockReturn - cost if money > 0 else 0
+        return money
+
+    def printData(self, trainSet, totalSet, realMoney, randomMoney, avgMoney, bestMoney):
+        years = (totalSet - trainSet) / 250.8
+        print 'Training days:', trainSet, 'Testing days:', (totalSet - trainSet), 'Total days:', totalSet
+        print ('%-14s %14f %2.2f') % ('Real Money:', realMoney, self.CAGR(realMoney, years))
+        print ('%-14s %14f %2.2f') % ('Random Money:', randomMoney, self.CAGR(randomMoney, years))
+        print ('%-14s %14f %2.2f') % ('Average Money:', avgMoney, self.CAGR(avgMoney, years))
+        print ('%-14s %14f %2.2f') % ('Best Money:', bestMoney, self.CAGR(bestMoney, years))
+
     def run(self):
         # get data
         trainingSets = {}
@@ -32,10 +46,10 @@ class Portfolio(object):
         for company in self.companies:
             trainingSets[company] = TrainingSet(self.featurizer, company)
             returns[company] = iter(self.stockHistory.getReturns(company)[self.featurizer.cut:])
-        testSet = 0
+        testStart = 0
         for trainingExample in TrainingSet(self.featurizer, self.companies[0]):
-            testSet += 1
-        testSet = int(testSet * (1 - self.testPercentage))
+            testStart += 1
+        testStart = int(testStart * (1 - self.testPercentage))
 
         # run LinUCB
         flag = True
@@ -64,17 +78,12 @@ class Portfolio(object):
                 if self.verbose:
                     print stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio, stocks
                 count += 1
-                if count > testSet:
-                    realMoney = realMoney + realMoney * stockReturn if realMoney > 0 else 0
-                    randomMoney = randomMoney + randomMoney * randomReturn if randomMoney > 0 else 0
-                    avgMoney = avgMoney + avgMoney * avgReturn if avgMoney > 0 else 0
-                    bestMoney = bestMoney + bestMoney * bestReturn if bestMoney > 0 else 0
-
-        print 'Training days:', testSet, 'Testing days:', (count - testSet), 'Total days:', count
-        print ('%-14s %14f %2.2f') % ('Real Money:', realMoney, self.CAGR(realMoney, (count - testSet) / 250.8))
-        print ('%-14s %14f %2.2f') % ('Random Money:', randomMoney, self.CAGR(randomMoney, (count - testSet) / 250.8))
-        print ('%-14s %14f %2.2f') % ('Average Money:', avgMoney, self.CAGR(avgMoney, (count - testSet) / 250.8))
-        print ('%-14s %14f %2.2f') % ('Best Money:', bestMoney, self.CAGR(bestMoney, (count - testSet) / 250.8))
+                if count > testStart:
+                    realMoney = self.updateMoney(realMoney, stockReturn)
+                    randomMoney = self.updateMoney(randomMoney, randomReturn)
+                    avgMoney = self.updateMoney(avgMoney, avgReturn)
+                    bestMoney = self.updateMoney(bestMoney, bestReturn)
+        self.printData(testStart, count, realMoney, randomMoney, avgMoney, bestMoney)
 
     def LinUCB(self, stocks, features, rewards, numberOfStocksToPick):
         p = []
