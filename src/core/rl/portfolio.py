@@ -14,7 +14,7 @@ class Portfolio(object):
         self.A = dict()
         self.b = dict()
         self.alpha = 1
-        self.stockCost = 0
+        self.stockCost = 0.005
         self.numToPick = pickNum
         self.testPercentage = testSize
         self.startMoney = money
@@ -26,10 +26,19 @@ class Portfolio(object):
         CAGR = totalReturn ** (1 / float(years))
         return ((CAGR - 1) * 100)
 
-    def updateMoney(self, money, stockReturn):
-        cost = self.stockCost * 2 * self.numToPick
-        money = money + money * stockReturn - cost if money > 0 else 0
+    def updateMoney(self, money, stockReturn, cost):
+        #cost = (self.stockCost * 2 * self.numToPick)
+        profit = money * stockReturn
+        money = money + profit - cost if money > 0 else 0
         return money
+
+    def getTradeCost(self, money, stocks, openPrices):
+        perStockMoney = money / self.numToPick
+        cost = 0
+        for stock in stocks:
+            price = openPrices[stock]
+            cost += ((perStockMoney / price) * self.stockCost * 2)
+        return cost
 
     def printData(self, trainSet, totalSet, realMoney, randomMoney, avgMoney, bestMoney):
         years = (totalSet - trainSet) / 250.8
@@ -43,9 +52,13 @@ class Portfolio(object):
         # get data
         trainingSets = {}
         returns = {}
+        opens = {}
         for company in self.companies:
             trainingSets[company] = TrainingSet(self.featurizer, company)
             returns[company] = iter(self.stockHistory.getReturns(company)[self.featurizer.cut:])
+            opens[company] = iter(self.stockHistory.getData(company, 'Open')[self.featurizer.cut:])
+
+        # determine test starting point
         testStart = 0
         for trainingExample in TrainingSet(self.featurizer, self.companies[0]):
             testStart += 1
@@ -63,14 +76,17 @@ class Portfolio(object):
             # get features and rewards
             features = []
             rewards = []
+            openPrices = {}
             companies = trainingSets.keys()
             for company in companies:
                 try:
                     features.append(trainingSets[company].next().features)
                     rewards.append(returns[company].next())
-                except:
+                    openPrices[company] = opens[company].next()
+                except StopIteration:
                     del trainingSets[company]
                     del returns[company]
+                    del opens[company]
             flag = len(trainingSets.keys()) != 0
             # call LinUCB
             if flag:
@@ -79,10 +95,11 @@ class Portfolio(object):
                     print stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio, stocks
                 count += 1
                 if count > testStart:
-                    realMoney = self.updateMoney(realMoney, stockReturn)
-                    randomMoney = self.updateMoney(randomMoney, randomReturn)
-                    avgMoney = self.updateMoney(avgMoney, avgReturn)
-                    bestMoney = self.updateMoney(bestMoney, bestReturn)
+                    cost = self.getTradeCost(realMoney, stocks, openPrices)
+                    realMoney = self.updateMoney(realMoney, stockReturn, cost)
+                    randomMoney = self.updateMoney(randomMoney, randomReturn, cost)
+                    avgMoney = self.updateMoney(avgMoney, avgReturn, cost)
+                    bestMoney = self.updateMoney(bestMoney, bestReturn, cost)
         self.printData(testStart, count, realMoney, randomMoney, avgMoney, bestMoney)
 
     def LinUCB(self, stocks, features, rewards, numberOfStocksToPick):
