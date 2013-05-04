@@ -166,10 +166,12 @@ class StockHistory :
         return nSharpe
 
 class Featurizer :
+
     outFeatures = 2
-    baseFeatures = 10
     statFeatures = 4
     numDaysOfHistory = 5
+    baseFeatures = 5 + numDaysOfHistory
+    
     def __init__(self, stockHistory, *args) :
         self.parseArgs(args)
         self.numFeatures = Featurizer.baseFeatures + len(self.statsToUse) * Featurizer.statFeatures
@@ -185,6 +187,7 @@ class Featurizer :
         self.averages = self.stockHistory.getAveragePrices(company)[self.cut:]
         self.returns = self.stockHistory.getReturns(company)[self.returnCut:]
         self.slopeFeatures = [self.stockHistory.nDaySlope(self.N, company, stat)[self.nDayCut:] for stat in self.statsToUse]
+        #self.volumeFeatures = [self.stockHistory.nDaySlope(self.N, company, VOLUME)
     
     def features(self, pos) :
         example = TrainingExample()
@@ -209,9 +212,9 @@ class Featurizer :
     
     def parseArgs(self, args) :
         self.statsToUse = [OPEN]
-        self.N = 3
-        self.slopePos = 0.5
-        self.slopeNeg = -0.5
+        self.N = 5
+        self.slopePos = 1.5
+        self.slopeNeg = -self.slopePos
         for i in range(len(args)) :
             arg = args[i]
             if i == 0 :

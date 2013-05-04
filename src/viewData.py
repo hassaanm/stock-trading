@@ -18,12 +18,16 @@ avg10 = stockHistory.nDayAverage(10, companyToGraph, statToGraph)
 slope10 = stockHistory.nDaySlope(10, companyToGraph, statToGraph)
 stddev10 = stockHistory.nDayStdDev(10, companyToGraph, statToGraph)
 
+rawdata = stockHistory.getData(companyToGraph, statToGraph)
+
 print '\n'.join(str(i) for i in zip(stockHistory.getData(companyToGraph, statToGraph)[100:], avg100, stddev100, slope100, avg10, slope10, stddev10))
 
 print 'Generating graphs'
 
-plot([avg100, stockHistory.getData(companyToGraph, statToGraph)], yerrs=[stddev100, None])
-plot([avg10, stockHistory.getData(companyToGraph, statToGraph)], yerrs=[stddev10, None])
-plot([slope100, slope10])
+plot([avg100, rawdata], yerrs=[stddev100, None])
+plot([avg10, rawdata], yerrs=[stddev10, None])
+plot([slope100, slope10, rawdata], scale=True)
+plot([stockHistory.getReturns(companyToGraph), rawdata], scale=True)
+plot([rawdata, stockHistory.getData(companyToGraph, 'Volume')], scale=True)
 
 print 'Done.'

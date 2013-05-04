@@ -107,7 +107,7 @@ class Portfolio(object):
             sharpeRatio += (reward - avgReturn)**2
 
         sharpeRatio = (sharpeRatio / float(numberOfStocksToPick))**0.5
-        sharpeRatio = avgReturn / sharpeRatio
+        sharpeRatio = avgReturn / sharpeRatio if sharpeRatio != 0 else 0
 
         # sharpe ratio reward
         #for stock, feature, reward in chosen:

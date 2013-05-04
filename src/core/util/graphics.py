@@ -5,10 +5,25 @@ try :
 except :
     pass
 
-def plot(yss, xss=None, labels=None, yerrs=None, title='', xlabel='', ylabel='', legendLoc=4, right=True) :
+def plot(yss, xss=None, labels=None, yerrs=None, title='', xlabel='', ylabel='', legendLoc=4, right=True, scale=False) :
     if not graphing :
         print 'Graphing is not available'
         return
+    if scale :
+        # the set of ys with the largest range is assummed to be at the end
+        scaleYs = yss[-1]
+        largeRange = max(scaleYs) - min(scaleYs)
+        nextLargestRange = 0
+        for i in range(len(yss) - 1) :
+            ys = yss[i]
+            r = max(ys) - min(ys)
+            if r > nextLargestRange :
+                nextLargestRange = r
+        multiplier = float(largeRange) / nextLargestRange
+        for i in range(len(yss) - 1) :
+            ys = yss[i]
+            for j in range(len(ys)) :
+                ys[j] *= multiplier
     if labels == None :
         labels = [str(i) for i in range(len(yss))]
     if yerrs != None :

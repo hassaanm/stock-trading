@@ -89,3 +89,4 @@ def retrainNN(args) :
     
 def testNN(args) :
     net = pickle.load(args[0])
+    
