@@ -24,7 +24,7 @@ for compName in companiesToGraph :
         title=compName,
         xlabel='Time',
         ylabel='Stock Price')
-
+"""
 sharpeRatios = []
 for comp in stockHistory.compNames() :
     sharpeRatios += stockHistory.nDaySharpeRatio(5, comp, data.OPEN)
@@ -44,4 +44,5 @@ sharpeRatios = []
 for comp in stockHistory.compNames() :
     sharpeRatios += stockHistory.nDaySharpeRatio(100, comp, data.OPEN)
 plotDistribution(sharpeRatios, -7, 1)
+"""
 print 'Done.'

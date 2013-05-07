@@ -1,4 +1,4 @@
-from core.util.data import StockHistory, TrainingSet, Featurizer
+from core.util.data import StockHistory, Featurizer
 from core.util.graphics import plot
 import pickle
 from pybrain.datasets import SupervisedDataSet

@@ -1,7 +1,7 @@
 import json
 import os
 import pickle
-from datetime import date
+from datetime import date, timedelta
 from itertools import islice, chain
 
 DATE      = 'Date'
@@ -39,7 +39,9 @@ class StockHistory :
         self.path = os.path.dirname(os.path.realpath(__file__)) + '/../../../data/' + dirName
         files = [f for f in os.listdir(self.path) if 'json' in f]
         print 'Reading files in', dirName
-        companyStockHistory = {}
+        self.data = {}
+        self.startDate = date(2014, 1, 1)
+        self.endDate = date(1970, 1, 1)
         for fName in files :
             f = open(self.path + '/' + fName, 'r')
             try :
@@ -53,259 +55,136 @@ class StockHistory :
             parts = fName.split('.')
             compName = parts[0]
             year = parts[1]
-            if compName not in companyStockHistory :
-                companyStockHistory[compName] = {}
-            companyStockHistory[compName][year] = quotes
-        # compile data for multiple years in one company
-        self.data = {}
-        for comp in companyStockHistory :
-            compYears = companyStockHistory[comp]
-            compData = []
-            for year in sorted(compYears.keys()) :
-                compData += compYears[year]
-            self.data[comp] = {}
-            for stat in AVAILABLE_STATS :
-                try :
-                    self.data[comp][stat] = [float(quote[stat]) for quote in compData]
-                except :
-                    self.data[comp][stat] = [quote[stat] for quote in compData]
-    
-    def hasCompanyData(self, compName) :
-        return compName in self.data
-    
-    def getData(self, compName, stat) :
-        try :
-            return self.data[compName][stat]
-        except KeyError:
-            return []
-            
-    def getAveragePrices(self, compName) :
-        mapKey = 'avgPrice'
-        try :
-            return self.data[compName][mapKey]
-        except KeyError:
-            pass
-        highs = self.getData(compName, HIGH)
-        lows = self.getData(compName, LOW)
-        avgPrices = [(h+l)/2. for (h,l) in zip(highs, lows)]
-        self.data[compName][mapKey] = avgPrices
-        return avgPrices
-            
-    def getDates(self, compName) :
-        mapKey = 'dates'
-        try :
-            return self.data[compName][mapKey]
-        except KeyError:
-            pass
-        data = self.getData(compName, DATE)
-        dates = []
-        for d in data :
-            ymd = [int(i) for i in d.split('-')]
-            dates.append(date(*ymd))
-        self.data[compName][mapKey] = dates
-        return dates
-        
-    def getReturns(self, compName) :
-        mapKey = 'returns'
-        try :
-            return self.data[compName][mapKey]
-        except KeyError:
-            pass
-        close = self.getData(compName, CLOSE)
-        open = self.getData(compName, OPEN)
-        returns = [(c-o)/o for (c,o) in zip(close,open)]
-        self.data[compName][mapKey] = returns
-        return returns
-    
+            if compName not in self.data :
+                self.data[compName] = {}
+            for quote in quotes :
+                for key in quote.keys() :
+                    if key.lower() == 'date' :
+                        ymd = [int(i) for i in quote[key].split('-')]
+                        quoteDate = date(*ymd)
+                        if quoteDate < self.startDate :
+                            self.startDate = quoteDate
+                        if quoteDate > self.endDate :
+                            self.endDate = quoteDate
+                        quote[key] = date(*ymd)
+                    else :
+                        quote[key] = float(quote[key])
+                self.data[compName][quote['date']] = quote
+        print 'Start date:', self.startDate
+        print 'End date:', self.endDate
+
+    def get(self, comp, date, stat) :
+        return self.data[comp][date][stat]
+
+    def getPrev(self, comp, date, stat) :
+        return self.get(comp, self.getNDaysAgo(1, comp, date), stat)
+
     def compNames(self) :
         return self.data.keys()
-    
-    def nDayAverage(self, n, compName, stat) :
-        mapKey = stat + 'Avg' + str(n)
-        try :
-            return self.data[compName][mapKey]
-        except KeyError:
-            pass
-        compData = self.getData(compName, stat)
-        nAvg = [sum(i)/n for i in window(compData, n)]
-        self.data[compName][mapKey] = nAvg
+
+    def hasDate(self, comp, date) :
+        return date in self.data[comp]
+
+    def getFirstDate(self, comp) :
+        return sorted(self.data[comp].keys())[0]
+
+    def getNDaysAgo(self, n, comp, date) :
+        while n != 0 :
+            date = date - timedelta(days=1)
+            if self.hasDate(comp, date) :
+                n -= 1
+        return date
+
+    def nDayAverage(self, n, comp, date, stat) :
+        key = str(n) + 'avg'
+        if key in self.data[comp][date] :
+            return self.data[comp][date][key]
+        dates = [self.getNDaysAgo(i, comp, date) for i in range(1, n+1)]
+        prices = [self.data[comp][d][stat] for d in dates]
+        nAvg = sum(prices) / float(n)
+        self.data[comp][date][key] = nAvg
         return nAvg
-    
-    def nDaySlope(self, n, compName, stat) :
-        mapKey = stat + 'Slope' + str(n)
-        try :
-            return self.data[compName][mapKey]
-        except KeyError:
-            pass
-        compData = self.getData(compName, stat)
-        nSlope = [(i[-1] - i[0])/n for i in window(compData, n)]
-        self.data[compName][mapKey] = nSlope
+
+    def nDaySlope(self, n, comp, date, stat) :
+        key = str(n) + 'slope'
+        if key in self.data[comp][date] :
+            return self.data[comp][date][key]
+        prevDate = self.getNDaysAgo(1, comp, date)
+        startDate = self.getNDaysAgo(n, comp, date)
+        nSlope = (self.data[comp][prevDate][stat] + self.data[comp][startDate][stat]) / float(n)
+        self.data[comp][date][key] = nSlope
         return nSlope
-    
-    def nDayStdDev(self, n, compName, stat) :
-        mapKey = stat + 'StdDev' + str(n)
-        try :
-            return self.data[compName][mapKey]
-        except KeyError:
-            pass
-        nAvg = self.nDayAverage(n, compName, stat)
-        compData = self.getData(compName, stat)
-        nStdDev = [sum(((x-a)**2)/n for x in w)**.5 for (w, a) in zip(window(compData, n), nAvg)]
-        self.data[compName][mapKey] = nStdDev
-        return nStdDev
-        
-    def nDaySharpeRatio(self, n, compName, stat) :
-        mapKey = stat + 'Sharpe' + str(n)
-        try :
-            return self.data[compName][mapKey]
-        except KeyError:
-            pass
-        nAvg = self.nDayAverage(n, compName, stat)
-        nStdDev = self.nDayStdDev(n, compName, stat)
-        nSharpe = [(a/s if s != 0 else 0) for (a,s) in zip(nAvg, nStdDev)]
-        self.data[compName][mapKey] = nSharpe
-        return nSharpe
+
+    def getReturn(self, n, comp, date) :
+        key = str(n) + 'return'
+        if key in self.data[comp][date] :
+            return self.data[comp][date][key]
+        returnDate = self.getNDaysAgo(n, comp, date)
+        o = self.data[comp][returnDate][OPEN]
+        c = self.data[comp][returnDate][CLOSE]
+        nReturn = (c-o)/o
+        self.data[comp][date][key] = nReturn
+        return nReturn
 
 class Featurizer :
-
-    outFeatures = 2
-    statFeatures = 11
-    numDaysOfHistory = 5
-    baseFeatures = 5 + numDaysOfHistory
-    
-    def __init__(self, stockHistory, company, *args) :
-        self.net = None
-        self.parseArgs(args)
+    def __init__(self, stockHistory) :
         self.stockHistory = stockHistory
-        self.cut = max(self.N, Featurizer.numDaysOfHistory)
-        self.returnCut = self.cut - Featurizer.numDaysOfHistory
-        self.nDayCut = 0 if self.returnCut > 0 else (Featurizer.numDaysOfHistory-self.N)
-        
-        self.dates = stockHistory.getDates(company)[self.cut:]
-        self.average = stockHistory.getAveragePrices(company)[self.cut:]
-        self.volume = stockHistory.getData(company, VOLUME)[self.cut:]
-        self.open = stockHistory.getData(company, OPEN)[self.cut:]
-        self.close = stockHistory.getData(company, CLOSE)[self.cut:]
-
-        self.returns = stockHistory.getReturns(company)[self.returnCut:]
-
-        self.nDaySlope = stockHistory.nDaySlope(self.N, company, OPEN)[self.nDayCut:]
-        self.nDayVolume = stockHistory.nDayAverage(self.N, company, VOLUME)[self.nDayCut:]
-        self.nDayOpenAverage = stockHistory.nDayAverage(self.N, company, OPEN)[self.nDayCut:]
-        self.nDayCloseAverage = stockHistory.nDayAverage(self.N, company, CLOSE)[self.nDayCut:]
-
+        self.numDaysHistory = 5
+        self.n = 5
+        self.slopePos = 1.5
+        self.slopeNeg = -self.slopePos
+        self.startDates = {}
         self.defineFeatures()
-        self.numExamples = len(self.dates) - 1
         self.numFeatures = len(self.featureFunctions)
-        self.numTargetFeatures = Featurizer.outFeatures
 
-    def loadNN(self, fname) :
-        f = open(fname, 'r')
-        self.net = pickle.load(f)
-        self.numFeatures += 2
-    
     def defineFeatures(self) :
         features = []
         # Add features for Monday thru Friday
         for i in range(5) :
-            features.append((lambda x: lambda pos : self.dates[pos].weekday() == x)(i))
-        # Add features for previous numDaysOfHistory days
-        #for i in range(Featurizer.numDaysOfHistory) :
-        #    features.append((lambda x: lambda pos : self.returns[pos] > 0.025)(i))
+            features.append((lambda x: lambda comp, date : date.weekday() == x)(i))
+        # Add features for previous numDaysHistory days
+        for i in range(1, self.numDaysHistory+1) :
+            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > 0.025)(i))
 
-        features.append(lambda pos : self.nDaySlope[pos] > 0)
-        features.append(lambda pos : self.nDaySlope[pos] < 0)
-        features.append(lambda pos : self.nDaySlope[pos] > self.slopePos)
-        features.append(lambda pos : self.nDaySlope[pos] < self.slopeNeg)
-
-        # figure out good values for these
-        features.append(lambda pos : self.open[pos] > self.nDayOpenAverage[pos])
-        features.append(lambda pos : self.open[pos] < self.nDayOpenAverage[pos])
+        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.n, comp, date, OPEN) > 0)
+        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.n, comp, date, OPEN) < 0)
+        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.n, comp, date, OPEN) > self.slopePos)
+        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.n, comp, date, OPEN) < self.slopeNeg)
 
         # figure out good values for these
-        features.append(lambda pos : self.close[pos] > self.nDayCloseAverage[pos])
-        features.append(lambda pos : self.close[pos] < self.nDayCloseAverage[pos])
+        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, OPEN) > self.stockHistory.nDayAverage(self.n, comp, date, OPEN))
+        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, OPEN) < self.stockHistory.nDayAverage(self.n, comp, date, OPEN))
 
         # figure out good values for these
-        features.append(lambda pos : self.volume[pos] > self.nDayVolume[pos])
-        features.append(lambda pos : self.volume[pos] < self.nDayVolume[pos])
+        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, CLOSE) > self.stockHistory.nDayAverage(self.n, comp, date, CLOSE))
+        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, CLOSE) < self.stockHistory.nDayAverage(self.n, comp, date, CLOSE))
 
-        features.append(lambda pos : self.volume[pos] > self.nDayVolume[pos] and self.nDaySlope[pos] > self.slopePos)
+        # figure out good values for these
+        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, VOLUME) > self.stockHistory.nDayAverage(self.n, comp, date, VOLUME))
+        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, VOLUME) < self.stockHistory.nDayAverage(self.n, comp, date, VOLUME))
+
+        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, VOLUME) > self.stockHistory.nDayAverage(self.n, comp, date, VOLUME) \
+            and self.stockHistory.nDaySlope(self.n, comp, date, OPEN) > self.slopePos)
         self.featureFunctions = features
-    
-    def features(self, pos) :
-        example = TrainingExample()
-        for feature in self.featureFunctions :
-            example.addFeature(feature(pos))
 
-        # Neural net output features
-        if self.net != None :
-            netOutput = [int(round(x)) for x in list(self.net.activate(example.features))]
-            for netOut in netOutput :
-                example.addFeature(netOut)
-        example.addOutput(self.average[pos] > self.average[pos+1])
-        example.addOutput(self.average[pos] < self.average[pos+1])
-        return example
-    
-    def parseArgs(self, args) :
-        self.stat = OPEN
-        self.N = 5
-        self.slopePos = 1.5
-        self.slopeNeg = -self.slopePos
-        for i in range(len(args)) :
-            arg = args[i]
-            if i == 0 :
-                self.N = int(arg)
-            if i == 1 :
-                self.slopePos = float(arg)
-            if i == 2 :
-                self.slopeNeg = float(arg)
-            if i == 3 :
-                s = arg.lower()
-                if s == 'o' :
-                    self.stat = OPEN
-                elif s == 'h' :
-                    self.stat = HIGH
-                elif s == 'l' :
-                    self.stat = LOW
-                elif s == 'c' :
-                    self.stat = CLOSE
-            if i == 4 :
-                break # no more args
-        """
-        print 'N:', self.N
-        print 'slopePos:', self.slopePos
-        print 'slopeNeg:', self.slopeNeg
-        print 'Using stats:', self.stat
-        """
+    def getFeatures(self, comp, date) :
+        return [self.boolToInt(f(comp, date)) for f in self.featureFunctions]
 
-class TrainingSet :
-    def __init__(self, stockHistory, company) :
-        self.pos = 0
-        self.company = company
-        self.featurizer = Featurizer(stockHistory, company)
-        self.numExamples = self.featurizer.numExamples
-    
-    def __iter__(self) :
-        return self
-        
-    def next(self) :
-        if self.pos >= self.numExamples:
-            raise StopIteration
-        example = self.featurizer.features(self.pos)
-        self.pos += 1
-        return example
-        
-class TrainingExample :
-    def __init__(self) :
-        self.features = []
-        self.output = []
-        
-    def addFeature(self, f) :
-        self.features.append(self.boolToInt(f))
-        
-    def addOutput(self, o) :
-        self.output.append(self.boolToInt(o))
-        
+    def getFirstDate(self, comp) :
+        if comp in self.startDates :
+            return self.startDates[comp]
+        start = self.stockHistory.getFirstDate(comp)
+        daysNeeded = max(self.numDaysHistory, self.n)
+        while daysNeeded != 0 :
+            start = start + timedelta(days=1)
+            if self.stockHistory.hasDate(comp, start) :
+                daysNeeded -= 1
+        self.startDates[comp] = start
+        return start
+
+    def isValidDate(self, comp, date) :
+        start = self.getFirstDate(comp)
+        return date >= start and self.stockHistory.hasDate(comp, date)
+
     def boolToInt(self, b) :
         return 1 if b else 0

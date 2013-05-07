@@ -2,13 +2,16 @@ import math
 import numpy
 import random
 
-from core.util.data import StockHistory, TrainingSet, Featurizer
+from core.util.data import StockHistory, Featurizer, OPEN
+from datetime import timedelta
 
 class Portfolio(object):
 
     def __init__(self, testSize=0.2, pickNum=5, money=10000.0, verbose = False):
         self.stockHistory = StockHistory('nasdaq100')
         self.companies = self.stockHistory.compNames()
+        self.featurizer = Featurizer(self.stockHistory)
+        self.numberOfFeatures = self.featurizer.numFeatures
 
         self.A = dict()
         self.b = dict()
@@ -18,17 +21,14 @@ class Portfolio(object):
         self.numToPick = int(pickNum)
         self.startMoney = float(money)
         self.verbose = int(verbose)
-        featurizer = Featurizer(self.stockHistory, self.companies[0])
-        self.numberOfFeatures = featurizer.numFeatures
-        self.cut = featurizer.cut + 1
 
+    # compound annual growth rate
     def CAGR(self, endMoney, years):
         totalReturn = endMoney / float(self.startMoney)
         CAGR = totalReturn ** (1 / float(years))
         return ((CAGR - 1) * 100)
 
     def updateMoney(self, money, stockReturn, cost):
-        #cost = (self.tradeCost * 2 * self.numToPick)
         profit = money * stockReturn
         money = money + profit - cost if money > 0 else 0
         return money
@@ -41,75 +41,37 @@ class Portfolio(object):
             cost += ((perStockMoney / price) * self.tradeCost * 2)
         return cost
 
-    def printData(self, trainSet, totalSet, realMoney, randomMoney, avgMoney):
-        years = (totalSet - trainSet) / 250.8
-        print 'Training days:', trainSet, 'Testing days:', (totalSet - trainSet), 'Total days:', totalSet
+    def printData(self, startDate, testStartDate, endDate, realMoney, randomMoney, avgMoney):
+        years = (endDate - testStartDate).days / 365.25
+        print 'Training days:', (testStartDate - startDate).days, 'Testing days:', (endDate - testStartDate).days, 'Total days:', (endDate - startDate).days
         print ('%-14s %14f %2.2f') % ('Real Money:', realMoney, self.CAGR(realMoney, years))
         print ('%-14s %14f %2.2f') % ('Random Money:', randomMoney, self.CAGR(randomMoney, years))
         print ('%-14s %14f %2.2f') % ('Average Money:', avgMoney, self.CAGR(avgMoney, years))
 
     def run(self):
-        # get data
-        trainingSets = {}
-        returns = {}
-        opens = {}
-        for company in self.companies:
-            trainingSets[company] = TrainingSet(self.stockHistory, company)
-            returns[company] = iter(self.stockHistory.getReturns(company)[self.cut:])
-            opens[company] = iter(self.stockHistory.getData(company, 'Open')[self.cut:])
-
-        # determine test starting point
-        testStart = 0
-        for trainingExample in TrainingSet(self.stockHistory, self.companies[0]):
-            testStart += 1
-        testStart = int(testStart * (1 - self.testPercentage))
-
-        # run LinUCB
-        flag = True
-        count = 0
-        realMoney = self.startMoney
-        randomMoney = self.startMoney
-        avgMoney = self.startMoney
-        # loop until out of training data
-        while flag:
-            # get features and rewards
-            features = []
-            rewards = []
-            openPrices = {}
-            companies = trainingSets.keys()
-            for company in companies:
-                try:
-                    f = trainingSets[company].next().features
-                    features.append(f)
-                    #print company, trainingSets[company].company, f
-                    rewards.append(returns[company].next())
-                    openPrices[company] = opens[company].next()
-                except StopIteration:
-                    del trainingSets[company]
-                    del returns[company]
-                    del opens[company]
-            flag = len(trainingSets.keys()) != 0
-            # call LinUCB
-            if flag:
-                stocks, stockReturn, randomReturn, avgReturn, sharpeRatio = self.LinUCB(companies, features, rewards, self.numToPick)
+        startDate = self.stockHistory.startDate
+        endDate = self.stockHistory.endDate
+        date = startDate
+        # real, random and average money
+        money = [self.startMoney, self.startMoney, self.startMoney]
+        testStartDate = timedelta(days=int((endDate - date).days * 0.8)) + date
+        while date < endDate :
+            companies = [company for company in self.companies if self.featurizer.isValidDate(company, date)]
+            features = [self.featurizer.getFeatures(company, date) for company in companies]
+            returns = [self.stockHistory.getReturn(0, company, date) for company in companies]
+            if len(companies) > 0 :
+                stocks, moneyReturns, sharpeRatio = self.LinUCB(companies, features, returns)
                 if self.verbose:
-                    print stockReturn, randomReturn, avgReturn, sharpeRatio, stocks
-                count += 1
-                if count > testStart:
-                    cost = self.getTradeCost(realMoney, stocks, openPrices)
-                    realMoney = self.updateMoney(realMoney, stockReturn, cost)
-                    randomMoney = self.updateMoney(randomMoney, randomReturn, cost)
-                    avgMoney = self.updateMoney(avgMoney, avgReturn, cost)
-        self.printData(testStart, count, realMoney, randomMoney, avgMoney)
+                    print moneyReturns, sharpeRatio, stocks
+                if date > testStartDate:
+                    openPrices = {company: self.stockHistory.get(company, date, OPEN) for company in stocks}
+                    cost = self.getTradeCost(money[0], stocks, openPrices)
+                    money = [self.updateMoney(m, r, cost) for (m, r) in zip(money, moneyReturns)]
+            date = date + timedelta(days=1)
+        self.printData(startDate, testStartDate, endDate, *money)
 
-    def LinUCB(self, stocks, features, rewards, numberOfStocksToPick):
+    def LinUCB(self, stocks, features, rewards):
         p = []
-        """
-        print '*' * 100
-        for feature in features :
-            print feature, len(features)
-        print '*' * 100
-        """
         for stock, feature, reward in zip(stocks, features, rewards):
             if stock not in self.A:
                 self.A[stock] = numpy.identity(self.numberOfFeatures)
@@ -122,22 +84,22 @@ class Portfolio(object):
 
         chosen = []
         sortedStocks = numpy.argsort(p)[::-1]
-        stockIndeces = sortedStocks[:numberOfStocksToPick]
+        stockIndeces = sortedStocks[:self.numToPick]
 
         stockReturn = 0
         sharpeRatio = 0
-        randomReturn = sum(random.sample(rewards, numberOfStocksToPick))
+        randomReturn = sum(random.sample(rewards, self.numToPick))
 
         for index in stockIndeces:
             chosen.append((stocks[index], features[index], rewards[index]))
             stockReturn += rewards[index]
 
-        avgStockReturn = stockReturn / float(numberOfStocksToPick)
+        avgStockReturn = stockReturn / float(self.numToPick)
         
         for stock, feature, reward in chosen:
             sharpeRatio += (reward - avgStockReturn)**2
 
-        sharpeRatio = (sharpeRatio / float(numberOfStocksToPick))**0.5
+        sharpeRatio = (sharpeRatio / float(self.numToPick))**0.5
         sharpeRatio = avgStockReturn / sharpeRatio if sharpeRatio != 0 else 0
 
         # sharpe ratio reward
@@ -150,7 +112,7 @@ class Portfolio(object):
         rewards.sort()
 
         chosenStocks, chosenFeatures, chosenRewards = zip(*chosen)
-        return chosenStocks, (stockReturn/numberOfStocksToPick), (randomReturn/numberOfStocksToPick), avgReturn, sharpeRatio
+        return chosenStocks, ((stockReturn/self.numToPick), (randomReturn/self.numToPick), avgReturn), sharpeRatio
 
 def runPortfolio(*args):
     portfolio = Portfolio(*args)
