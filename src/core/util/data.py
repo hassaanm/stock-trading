@@ -172,7 +172,7 @@ class Featurizer :
             features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) < self.slopeNeg)(stat))
 
         features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, VOLUME) > self.stockHistory.nDayAverage(self.averageN, comp, date, VOLUME) \
-            and self.stockHistory.nDaySlope(self.slopeN, comp, date, OPEN) > self.slopePos)
+            and self.stockHistory.getPrev(comp, date, OPEN) > self.stockHistory.nDayAverage(self.averageN, comp, date, OPEN))
         self.featureFunctions = features
 
     def getFeatures(self, comp, date) :
