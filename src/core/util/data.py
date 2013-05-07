@@ -40,7 +40,7 @@ class StockHistory :
         files = [f for f in os.listdir(self.path) if 'json' in f]
         print 'Reading files in', dirName
         self.data = {}
-        self.startDate = date(2014, 1, 1)
+        self.startDate = date.today()
         self.endDate = date(1970, 1, 1)
         for fName in files :
             f = open(self.path + '/' + fName, 'r')
@@ -96,7 +96,7 @@ class StockHistory :
         return date
 
     def nDayAverage(self, n, comp, date, stat) :
-        key = str(n) + 'avg'
+        key = str(n) + 'avg' + stat
         if key in self.data[comp][date] :
             return self.data[comp][date][key]
         dates = [self.getNDaysAgo(i, comp, date) for i in range(1, n+1)]
@@ -106,12 +106,12 @@ class StockHistory :
         return nAvg
 
     def nDaySlope(self, n, comp, date, stat) :
-        key = str(n) + 'slope'
+        key = str(n) + 'slope' + stat
         if key in self.data[comp][date] :
             return self.data[comp][date][key]
         prevDate = self.getNDaysAgo(1, comp, date)
         startDate = self.getNDaysAgo(n, comp, date)
-        nSlope = (self.data[comp][prevDate][stat] + self.data[comp][startDate][stat]) / float(n)
+        nSlope = (self.data[comp][prevDate][stat] - self.data[comp][startDate][stat]) / float(n)
         self.data[comp][date][key] = nSlope
         return nSlope
 
@@ -127,13 +127,30 @@ class StockHistory :
         return nReturn
 
 class Featurizer :
-    def __init__(self, stockHistory) :
+    def __init__(self, stockHistory, numDaysHistory=5, slopeN=5, averageN=5, returnThreshold=0, slopePos=1.5, slopeNeg=-1.5, stats=None) :
         self.stockHistory = stockHistory
-        self.numDaysHistory = 5
-        self.n = 5
-        self.slopePos = 1.5
-        self.slopeNeg = -self.slopePos
+        self.numDaysHistory = numDaysHistory
+        self.slopeN = slopeN
+        self.averageN = averageN
+        self.returnThreshold = returnThreshold
+        self.slopePos = slopePos
+        self.slopeNeg = slopeNeg
         self.startDates = {}
+        if stats == None :
+            self.stats = [OPEN, CLOSE, VOLUME]
+        else :
+            self.stats = []
+            for s in stats.lower() :
+                if s == 'o' :
+                    self.stats.append(OPEN)
+                elif s == 'h' :
+                    self.stats.append(HIGH)
+                elif s == 'l' :
+                    self.stats.append(LOW)
+                elif s == 'c' :
+                    self.stats.append(CLOSE)
+                elif s == 'v' :
+                    self.stats.append(VOLUME)
         self.defineFeatures()
         self.numFeatures = len(self.featureFunctions)
 
@@ -144,27 +161,19 @@ class Featurizer :
             features.append((lambda x: lambda comp, date : date.weekday() == x)(i))
         # Add features for previous numDaysHistory days
         for i in range(1, self.numDaysHistory+1) :
-            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > 0.025)(i))
+            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > self.returnThreshold)(i))
 
-        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.n, comp, date, OPEN) > 0)
-        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.n, comp, date, OPEN) < 0)
-        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.n, comp, date, OPEN) > self.slopePos)
-        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.n, comp, date, OPEN) < self.slopeNeg)
+        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, OPEN) > 0)
+        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, OPEN) < 0)
+        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, OPEN) > self.slopePos)
+        features.append(lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, OPEN) < self.slopeNeg)
 
-        # figure out good values for these
-        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, OPEN) > self.stockHistory.nDayAverage(self.n, comp, date, OPEN))
-        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, OPEN) < self.stockHistory.nDayAverage(self.n, comp, date, OPEN))
+        for stat in self.stats :
+            features.append((lambda x: lambda comp, date : self.stockHistory.getPrev(comp, date, x) > self.stockHistory.nDayAverage(self.averageN, comp, date, x))(stat))
+            features.append((lambda x: lambda comp, date : self.stockHistory.getPrev(comp, date, x) < self.stockHistory.nDayAverage(self.averageN, comp, date, x))(stat))
 
-        # figure out good values for these
-        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, CLOSE) > self.stockHistory.nDayAverage(self.n, comp, date, CLOSE))
-        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, CLOSE) < self.stockHistory.nDayAverage(self.n, comp, date, CLOSE))
-
-        # figure out good values for these
-        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, VOLUME) > self.stockHistory.nDayAverage(self.n, comp, date, VOLUME))
-        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, VOLUME) < self.stockHistory.nDayAverage(self.n, comp, date, VOLUME))
-
-        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, VOLUME) > self.stockHistory.nDayAverage(self.n, comp, date, VOLUME) \
-            and self.stockHistory.nDaySlope(self.n, comp, date, OPEN) > self.slopePos)
+        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, VOLUME) > self.stockHistory.nDayAverage(self.averageN, comp, date, VOLUME) \
+            and self.stockHistory.nDaySlope(self.slopeN, comp, date, OPEN) > self.slopePos)
         self.featureFunctions = features
 
     def getFeatures(self, comp, date) :
@@ -174,7 +183,7 @@ class Featurizer :
         if comp in self.startDates :
             return self.startDates[comp]
         start = self.stockHistory.getFirstDate(comp)
-        daysNeeded = max(self.numDaysHistory, self.n)
+        daysNeeded = max(self.numDaysHistory, self.slopeN, self.averageN)
         while daysNeeded != 0 :
             start = start + timedelta(days=1)
             if self.stockHistory.hasDate(comp, start) :

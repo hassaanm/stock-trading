@@ -54,7 +54,7 @@ class Portfolio(object):
         date = startDate
         # real, random and average money
         money = [self.startMoney, self.startMoney, self.startMoney]
-        testStartDate = timedelta(days=int((endDate - date).days * 0.8)) + date
+        testStartDate = timedelta(days=int((endDate - date).days * self.testPercentage)) + date
         while date < endDate :
             companies = [company for company in self.companies if self.featurizer.isValidDate(company, date)]
             features = [self.featurizer.getFeatures(company, date) for company in companies]
