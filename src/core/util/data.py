@@ -173,96 +173,70 @@ class Featurizer :
     numDaysOfHistory = 5
     baseFeatures = 5 + numDaysOfHistory
     
-    def __init__(self, stockHistory, *args) :
+    def __init__(self, stockHistory, company, *args) :
+        self.net = None
         self.parseArgs(args)
-        self.numFeatures = Featurizer.baseFeatures + Featurizer.statFeatures
-        self.numTargetFeatures = Featurizer.outFeatures
         self.stockHistory = stockHistory
         self.cut = max(self.N, Featurizer.numDaysOfHistory)
         self.returnCut = self.cut - Featurizer.numDaysOfHistory
         self.nDayCut = 0 if self.returnCut > 0 else (Featurizer.numDaysOfHistory-self.N)
-        self.net = None
+        
+        self.dates = stockHistory.getDates(company)[self.cut:]
+        self.average = stockHistory.getAveragePrices(company)[self.cut:]
+        self.volume = stockHistory.getData(company, VOLUME)[self.cut:]
+        self.open = stockHistory.getData(company, OPEN)[self.cut:]
+        self.close = stockHistory.getData(company, CLOSE)[self.cut:]
+
+        self.returns = stockHistory.getReturns(company)[self.returnCut:]
+
+        self.nDaySlope = stockHistory.nDaySlope(self.N, company, OPEN)[self.nDayCut:]
+        self.nDayVolume = stockHistory.nDayAverage(self.N, company, VOLUME)[self.nDayCut:]
+        self.nDayOpenAverage = stockHistory.nDayAverage(self.N, company, OPEN)[self.nDayCut:]
+        self.nDayCloseAverage = stockHistory.nDayAverage(self.N, company, CLOSE)[self.nDayCut:]
+
+        self.defineFeatures()
+        self.numExamples = len(self.dates) - 1
+        self.numFeatures = len(self.featureFunctions)
+        self.numTargetFeatures = Featurizer.outFeatures
 
     def loadNN(self, fname) :
         f = open(fname, 'r')
         self.net = pickle.load(f)
         self.numFeatures += 2
-        
-    def setCompany(self, company) :
-        self.dates = self.stockHistory.getDates(company)[self.cut:]
-        self.average = self.stockHistory.getAveragePrices(company)[self.cut:]
-        self.volume = self.stockHistory.getData(company, VOLUME)[self.cut:]
-        self.open = self.stockHistory.getData(company, OPEN)[self.cut:]
-        self.close = self.stockHistory.getData(company, CLOSE)[self.cut:]
-
-        self.returns = self.stockHistory.getReturns(company)[self.returnCut:]
-
-        self.nDaySlope = self.stockHistory.nDaySlope(self.N, company, OPEN)[self.nDayCut:]
-        self.nDayVolume = self.stockHistory.nDayAverage(self.N, company, VOLUME)[self.nDayCut:]
-        self.nDayOpenAverage = self.stockHistory.nDayAverage(self.N, company, OPEN)[self.nDayCut:]
-        self.nDayCloseAverage = self.stockHistory.nDayAverage(self.N, company, CLOSE)[self.nDayCut:]
-
-        self.numExamples = len(self.dates) - 1
-    """
+    
     def defineFeatures(self) :
         features = []
         # Add features for Monday thru Friday
         for i in range(5) :
-            features.append(lambda pos : self.dates[pos].weekday() == i)
+            features.append((lambda x: lambda pos : self.dates[pos].weekday() == x)(i))
         # Add features for previous numDaysOfHistory days
-        for i in range(Featurizer.numDaysOfHistory) :
-            features.append(lambda pos : self.returns[pos - i] > 0.025)
+        #for i in range(Featurizer.numDaysOfHistory) :
+        #    features.append((lambda x: lambda pos : self.returns[pos] > 0.025)(i))
 
-        example.addFeature(self.nDaySlope[pos] > 0)
-        example.addFeature(self.nDaySlope[pos] < 0)
-        example.addFeature(self.nDaySlope[pos] > self.slopePos)
-        example.addFeature(self.nDaySlope[pos] < self.slopeNeg)
-
-        # figure out good values for these
-        example.addFeature(self.open[pos] > self.nDayOpenAverage[pos])
-        example.addFeature(self.open[pos] < self.nDayOpenAverage[pos])
+        features.append(lambda pos : self.nDaySlope[pos] > 0)
+        features.append(lambda pos : self.nDaySlope[pos] < 0)
+        features.append(lambda pos : self.nDaySlope[pos] > self.slopePos)
+        features.append(lambda pos : self.nDaySlope[pos] < self.slopeNeg)
 
         # figure out good values for these
-        #example.addFeature(self.close[pos] > self.nDayCloseAverage[pos])
-        #example.addFeature(self.close[pos] < self.nDayCloseAverage[pos])
+        features.append(lambda pos : self.open[pos] > self.nDayOpenAverage[pos])
+        features.append(lambda pos : self.open[pos] < self.nDayOpenAverage[pos])
 
         # figure out good values for these
-        example.addFeature(self.volume[pos] > self.nDayVolume[pos])
-        example.addFeature(self.volume[pos] < self.nDayVolume[pos])
+        features.append(lambda pos : self.close[pos] > self.nDayCloseAverage[pos])
+        features.append(lambda pos : self.close[pos] < self.nDayCloseAverage[pos])
 
-        example.addFeature(self.volume[pos] > self.nDayVolume[pos] and self.nDaySlope[pos] > self.slopePos)
-    """
+        # figure out good values for these
+        features.append(lambda pos : self.volume[pos] > self.nDayVolume[pos])
+        features.append(lambda pos : self.volume[pos] < self.nDayVolume[pos])
+
+        features.append(lambda pos : self.volume[pos] > self.nDayVolume[pos] and self.nDaySlope[pos] > self.slopePos)
+        self.featureFunctions = features
+    
     def features(self, pos) :
         example = TrainingExample()
-        date = self.dates[pos].weekday()
-        # Add features for Monday thru Friday
-        for i in range(5) :
-            if i == date :
-                example.addFeature(1)
-            else :
-                example.addFeature(0)
-        # Add features for previous numDaysOfHistory days
-        for i in range(Featurizer.numDaysOfHistory) :
-            example.addFeature(self.returns[pos + i] > 0.025)
-
-        example.addFeature(self.nDaySlope[pos] > 0)
-        example.addFeature(self.nDaySlope[pos] < 0)
-        example.addFeature(self.nDaySlope[pos] > self.slopePos)
-        example.addFeature(self.nDaySlope[pos] < self.slopeNeg)
-
-        # figure out good values for these
-        example.addFeature(self.open[pos] > self.nDayOpenAverage[pos])
-        example.addFeature(self.open[pos] < self.nDayOpenAverage[pos])
-
-        # figure out good values for these
-        example.addFeature(self.close[pos] > self.nDayCloseAverage[pos])
-        example.addFeature(self.close[pos] < self.nDayCloseAverage[pos])
-
-        # figure out good values for these
-        example.addFeature(self.volume[pos] > self.nDayVolume[pos])
-        example.addFeature(self.volume[pos] < self.nDayVolume[pos])
-
-        example.addFeature(self.volume[pos] > self.nDayVolume[pos] and self.nDaySlope[pos] > self.slopePos)
+        for feature in self.featureFunctions :
+            example.addFeature(feature(pos))
 
         # Neural net output features
         if self.net != None :
@@ -298,17 +272,19 @@ class Featurizer :
                     self.stat = CLOSE
             if i == 4 :
                 break # no more args
+        """
         print 'N:', self.N
         print 'slopePos:', self.slopePos
         print 'slopeNeg:', self.slopeNeg
         print 'Using stats:', self.stat
+        """
 
 class TrainingSet :
-    def __init__(self, featurizer, company) :
+    def __init__(self, stockHistory, company) :
         self.pos = 0
-        featurizer.setCompany(company)
-        self.numExamples = featurizer.numExamples
-        self.featurizer = featurizer
+        self.company = company
+        self.featurizer = Featurizer(stockHistory, company)
+        self.numExamples = self.featurizer.numExamples
     
     def __iter__(self) :
         return self

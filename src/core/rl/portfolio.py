@@ -6,12 +6,9 @@ from core.util.data import StockHistory, TrainingSet, Featurizer
 
 class Portfolio(object):
 
-    def __init__(self, testSize=0.2, pickNum=5, money=10000.0, verbose = False, netFname=None):
+    def __init__(self, testSize=0.2, pickNum=5, money=10000.0, verbose = False):
         self.stockHistory = StockHistory('nasdaq100')
         self.companies = self.stockHistory.compNames()
-        self.featurizer = Featurizer(self.stockHistory)
-        if netFname != None :
-            self.featurizer.loadNN(netFname)
 
         self.A = dict()
         self.b = dict()
@@ -21,7 +18,9 @@ class Portfolio(object):
         self.numToPick = int(pickNum)
         self.startMoney = float(money)
         self.verbose = int(verbose)
-        self.numberOfFeatures = self.featurizer.numFeatures
+        featurizer = Featurizer(self.stockHistory, self.companies[0])
+        self.numberOfFeatures = featurizer.numFeatures
+        self.cut = featurizer.cut
 
     def CAGR(self, endMoney, years):
         totalReturn = endMoney / float(self.startMoney)
@@ -40,7 +39,7 @@ class Portfolio(object):
         for stock in stocks:
             price = openPrices[stock]
             cost += ((perStockMoney / price) * self.tradeCost * 2)
-        return cost
+        return 7*2*self.numToPick
 
     def printData(self, trainSet, totalSet, realMoney, randomMoney, avgMoney):
         years = (totalSet - trainSet) / 250.8
@@ -55,13 +54,13 @@ class Portfolio(object):
         returns = {}
         opens = {}
         for company in self.companies:
-            trainingSets[company] = TrainingSet(self.featurizer, company)
-            returns[company] = iter(self.stockHistory.getReturns(company)[self.featurizer.cut:])
-            opens[company] = iter(self.stockHistory.getData(company, 'Open')[self.featurizer.cut:])
+            trainingSets[company] = TrainingSet(self.stockHistory, company)
+            returns[company] = iter(self.stockHistory.getReturns(company)[self.cut:])
+            opens[company] = iter(self.stockHistory.getData(company, 'Open')[self.cut:])
 
         # determine test starting point
         testStart = 0
-        for trainingExample in TrainingSet(self.featurizer, self.companies[0]):
+        for trainingExample in TrainingSet(self.stockHistory, self.companies[0]):
             testStart += 1
         testStart = int(testStart * (1 - self.testPercentage))
 
@@ -80,7 +79,9 @@ class Portfolio(object):
             companies = trainingSets.keys()
             for company in companies:
                 try:
-                    features.append(trainingSets[company].next().features)
+                    f = trainingSets[company].next().features
+                    features.append(f)
+                    #print company, trainingSets[company].company, f
                     rewards.append(returns[company].next())
                     openPrices[company] = opens[company].next()
                 except StopIteration:
@@ -103,7 +104,12 @@ class Portfolio(object):
 
     def LinUCB(self, stocks, features, rewards, numberOfStocksToPick):
         p = []
-
+        """
+        print '*' * 100
+        for feature in features :
+            print feature, len(features)
+        print '*' * 100
+        """
         for stock, feature, reward in zip(stocks, features, rewards):
             if stock not in self.A:
                 self.A[stock] = numpy.identity(self.numberOfFeatures)
