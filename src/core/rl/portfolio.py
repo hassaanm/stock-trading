@@ -64,7 +64,7 @@ class Portfolio(object):
         date = startDate
         # real, random and average money
         money = [self.startMoney, self.startMoney, self.startMoney]
-        testStartDate = timedelta(days=int((endDate - date).days * self.testPercentage)) + date
+        testStartDate = timedelta(days=int((endDate - date).days * (1 - self.testPercentage))) + date
         while date < endDate :
             sys.stdout.write("\r%s" %str(date))
             sys.stdout.flush()
@@ -74,7 +74,7 @@ class Portfolio(object):
             if len(companies) > 0 :
                 stocks, moneyReturns, sharpeRatio = self.LinUCB(companies, features, returns)
                 if self.verbose:
-                    print ('%8.5f\t%8.5f\t%8.5f\t%8.5f\t%s') % (moneyReturns[0], moneyReturns[1], moneyReturns[2], sharpeRatio, stocks)
+                    print ('%10f\t%8.5f\t%8.5f\t%8.5f\t%8.5f\t%s') % (money[0], moneyReturns[0], moneyReturns[1], moneyReturns[2], sharpeRatio, stocks)
                 if date > testStartDate:
                     openPrices = {company: self.stockHistory.get(company, date, OPEN) for company in stocks}
                     cost = self.getTradeCost(money[0], stocks, openPrices)
