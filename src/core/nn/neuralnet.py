@@ -82,11 +82,28 @@ def trainNN(args) :
         plot(errorsPerEpoch)
     except:
         pass
+    testNN(net)
     return net
-    
-def retrainNN(args) :
-    net = pickle.load(args[0])
-    
-def testNN(args) :
-    net = pickle.load(args[0])
-    
+
+def loadNN(args) :
+    # load neural net
+    f = open(args[0], 'r')
+    net = pickle.load(f)
+    return net
+
+def testNN(net) :
+    stockHistory = StockHistory('nasdaq100')
+    companies = stockHistory.compNames()
+    featurizer = Featurizer(stockHistory)
+    matches = 0
+    total = 0
+    for company in companies :
+        trainingSet = TrainingSet(featurizer, company)
+        for trainingExample in trainingSet :
+            total += 1
+            features = trainingExample.features
+            output = trainingExample.output
+            nnOutput = [int(round(x)) for x in list(net.activate(features))]
+            if nnOutput == output :
+                matches += 1
+    print 'Correct Percentage:', float(matches) / total, '%'

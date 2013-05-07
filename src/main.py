@@ -14,10 +14,10 @@ def main() :
     elif method == 'retrainNN' :
         testNN(args)
     elif method == 'testNN' :
-        testNN(args)
+        testNN(loadNN(args))
     elif method == 'rl' :
         # number of stocks to choose, test set percentage, starting money amount
-        runPortfolio(int(args[0]), float(args[1]), float(args[2]), int(args[3]))
+        runPortfolio(*args)
     
     
 def usage() :

@@ -180,6 +180,11 @@ class Featurizer :
         self.cut = max(self.N, Featurizer.numDaysOfHistory)
         self.returnCut = self.cut - Featurizer.numDaysOfHistory
         self.nDayCut = 0 if self.returnCut > 0 else (Featurizer.numDaysOfHistory-self.N)
+        self.net = None
+
+    def loadNN(self, fname) :
+        f = open(args[0], 'r')
+        self.net = pickle.load(f)
         
     def setCompany(self, company) :
         self.dates = self.stockHistory.getDates(company)[self.cut:]
@@ -206,6 +211,10 @@ class Featurizer :
             example.addFeature(sFeature[pos] < 0)
             example.addFeature(sFeature[pos] > self.slopePos)
             example.addFeature(sFeature[pos] < self.slopeNeg)
+        if self.net != None :
+            netOutput = [int(round(x)) for x in list(self.net.activate(example.features))]
+            for netOut in netOutput :
+                example.addFeature(netOut)
         example.addOutput(self.averages[pos] > self.averages[pos+1])
         example.addOutput(self.averages[pos] < self.averages[pos+1])
         return example

@@ -6,7 +6,7 @@ from core.util.data import StockHistory, TrainingSet, Featurizer
 
 class Portfolio(object):
 
-    def __init__(self, pickNum, testSize, money, verbose = False):
+    def __init__(self, testSize=0.2, pickNum=5, money=10000.0, verbose = False):
         self.stockHistory = StockHistory('nasdaq100')
         self.companies = self.stockHistory.compNames()
         self.featurizer = Featurizer(self.stockHistory)
@@ -15,10 +15,10 @@ class Portfolio(object):
         self.b = dict()
         self.alpha = 1
         self.stockCost = 0.005
-        self.numToPick = pickNum
-        self.testPercentage = testSize
-        self.startMoney = money
-        self.verbose = verbose
+        self.testPercentage = float(testSize)
+        self.numToPick = int(pickNum)
+        self.startMoney = float(money)
+        self.verbose = int(verbose)
         self.numberOfFeatures = self.featurizer.numFeatures
 
     def CAGR(self, endMoney, years):
@@ -148,6 +148,6 @@ class Portfolio(object):
         chosenStocks, chosenFeatures, chosenRewards = zip(*chosen)
         return chosenStocks, (stockReturn/numberOfStocksToPick), (randomReturn/numberOfStocksToPick), avgReturn, (bestReturn/numberOfStocksToPick), sharpeRatio
 
-def runPortfolio(numOfStocks, testPercentage, money, verbose):
-    portfolio = Portfolio(numOfStocks, testPercentage, money, verbose)
+def runPortfolio(*args):
+    portfolio = Portfolio(*args)
     portfolio.run()
