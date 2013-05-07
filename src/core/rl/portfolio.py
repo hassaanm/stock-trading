@@ -90,7 +90,7 @@ class Portfolio(object):
             flag = len(trainingSets.keys()) != 0
             # call LinUCB
             if flag:
-                stocks, stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio = self.LinUCB(self.companies, features, rewards, self.numToPick)
+                stocks, stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio = self.LinUCB(companies, features, rewards, self.numToPick)
                 if self.verbose:
                     print stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio, stocks
                 count += 1
