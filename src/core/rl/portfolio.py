@@ -10,7 +10,7 @@ class Portfolio(object):
     def __init__(self, testSize=0.2, pickNum=5, money=10000.0, verbose = False):
         self.stockHistory = StockHistory('nasdaq100')
         self.companies = self.stockHistory.compNames()
-        self.featurizer = Featurizer(self.stockHistory, 5, 5, 5, 0, 1.5, -1.5)
+        self.featurizer = Featurizer(self.stockHistory)
         self.numberOfFeatures = self.featurizer.numFeatures
 
         self.A = dict()
@@ -72,9 +72,7 @@ class Portfolio(object):
 
     def LinUCB(self, stocks, features, rewards):
         p = []
-        print '*' * 100
         for stock, feature, reward in zip(stocks, features, rewards):
-            print ('%s %5s %10.7f') % (feature, stock, reward)
             if stock not in self.A:
                 self.A[stock] = numpy.identity(self.numberOfFeatures)
                 self.b[stock] = numpy.zeros(self.numberOfFeatures)
@@ -83,7 +81,6 @@ class Portfolio(object):
             p.append(float(numpy.dot(theta.T, x) + self.alpha * math.sqrt(numpy.dot(numpy.dot(x.T, numpy.linalg.inv(self.A[stock])), x))))
             self.A[stock] += numpy.dot(x, x.T)
             self.b[stock] += reward * x.T
-        print '*' * 100
 
         chosen = []
         sortedStocks = numpy.argsort(p)[::-1]
