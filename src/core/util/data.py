@@ -163,7 +163,6 @@ class Featurizer :
         for i in range(1, self.numDaysHistory+1) :
             features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > self.returnThreshold)(i))
 
-
         for stat in self.stats :
             features.append((lambda x: lambda comp, date : self.stockHistory.getPrev(comp, date, x) > self.stockHistory.nDayAverage(self.averageN, comp, date, x))(stat))
             features.append((lambda x: lambda comp, date : self.stockHistory.getPrev(comp, date, x) < self.stockHistory.nDayAverage(self.averageN, comp, date, x))(stat))
