@@ -1,16 +1,24 @@
 import math
 import numpy
 import random
+import sys
+from datetime import timedelta
 
 from core.util.data import StockHistory, Featurizer, OPEN
-from datetime import timedelta
+
 
 class Portfolio(object):
 
-    def __init__(self, testSize=0.2, pickNum=5, money=10000.0, verbose = False):
-        self.stockHistory = StockHistory('nasdaq100')
+    def __init__(self, stockHistory=None, featurizer=None, testSize=0.2, pickNum=5, money=10000.0, verbose = False):
+        if stockHistory == None :
+            self.stockHistory = StockHistory('nasdaq100')
+        else :
+            self.stockHistory = stockHistory
         self.companies = self.stockHistory.compNames()
-        self.featurizer = Featurizer(self.stockHistory)
+        if featurizer == None :
+            self.featurizer = Featurizer(self.stockHistory)
+        else :
+            self.featurizer = featurizer
         self.numberOfFeatures = self.featurizer.numFeatures
 
         self.A = dict()
@@ -43,10 +51,12 @@ class Portfolio(object):
 
     def printData(self, startDate, testStartDate, endDate, realMoney, randomMoney, avgMoney):
         years = (endDate - testStartDate).days / 365.25
+        realCAGR = self.CAGR(realMoney, years)
         print 'Training days:', (testStartDate - startDate).days, 'Testing days:', (endDate - testStartDate).days, 'Total days:', (endDate - startDate).days
-        print ('%-14s %14f %2.2f') % ('Real Money:', realMoney, self.CAGR(realMoney, years))
+        print ('%-14s %14f %2.2f') % ('Real Money:', realMoney, realCAGR)
         print ('%-14s %14f %2.2f') % ('Random Money:', randomMoney, self.CAGR(randomMoney, years))
         print ('%-14s %14f %2.2f') % ('Average Money:', avgMoney, self.CAGR(avgMoney, years))
+        return realCAGR
 
     def run(self):
         startDate = self.stockHistory.startDate
@@ -56,6 +66,8 @@ class Portfolio(object):
         money = [self.startMoney, self.startMoney, self.startMoney]
         testStartDate = timedelta(days=int((endDate - date).days * self.testPercentage)) + date
         while date < endDate :
+            sys.stdout.write("\r%s" %str(date))
+            sys.stdout.flush()
             companies = [company for company in self.companies if self.featurizer.isValidDate(company, date)]
             features = [self.featurizer.getFeatures(company, date) for company in companies]
             returns = [self.stockHistory.getReturn(0, company, date) for company in companies]
@@ -68,7 +80,8 @@ class Portfolio(object):
                     cost = self.getTradeCost(money[0], stocks, openPrices)
                     money = [self.updateMoney(m, r, cost) for (m, r) in zip(money, moneyReturns)]
             date = date + timedelta(days=1)
-        self.printData(startDate, testStartDate, endDate, *money)
+        cagr = self.printData(startDate, testStartDate, endDate, *money)
+        return cagr
 
     def LinUCB(self, stocks, features, rewards):
         p = []
@@ -114,6 +127,6 @@ class Portfolio(object):
         chosenStocks, chosenFeatures, chosenRewards = zip(*chosen)
         return chosenStocks, ((stockReturn/self.numToPick), (randomReturn/self.numToPick), avgReturn), sharpeRatio
 
-def runPortfolio(*args):
-    portfolio = Portfolio(*args)
+def runPortfolio(stockHistory=None, featurizer=None, *args):
+    portfolio = Portfolio(stockHistory, featurizer, *args)
     portfolio.run()
