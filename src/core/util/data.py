@@ -1,5 +1,6 @@
 import json
 import os
+import pickle
 from datetime import date
 from itertools import islice, chain
 
@@ -168,13 +169,13 @@ class StockHistory :
 class Featurizer :
 
     outFeatures = 2
-    statFeatures = 4
+    statFeatures = 11
     numDaysOfHistory = 5
     baseFeatures = 5 + numDaysOfHistory
     
     def __init__(self, stockHistory, *args) :
         self.parseArgs(args)
-        self.numFeatures = Featurizer.baseFeatures + len(self.statsToUse) * Featurizer.statFeatures
+        self.numFeatures = Featurizer.baseFeatures + Featurizer.statFeatures
         self.numTargetFeatures = Featurizer.outFeatures
         self.stockHistory = stockHistory
         self.cut = max(self.N, Featurizer.numDaysOfHistory)
@@ -183,17 +184,54 @@ class Featurizer :
         self.net = None
 
     def loadNN(self, fname) :
-        f = open(args[0], 'r')
+        f = open(fname, 'r')
         self.net = pickle.load(f)
+        self.numFeatures += 2
         
     def setCompany(self, company) :
         self.dates = self.stockHistory.getDates(company)[self.cut:]
-        self.numExamples = len(self.dates) - 1
-        self.averages = self.stockHistory.getAveragePrices(company)[self.cut:]
+        self.average = self.stockHistory.getAveragePrices(company)[self.cut:]
+        self.volume = self.stockHistory.getData(company, VOLUME)[self.cut:]
+        self.open = self.stockHistory.getData(company, OPEN)[self.cut:]
+        self.close = self.stockHistory.getData(company, CLOSE)[self.cut:]
+
         self.returns = self.stockHistory.getReturns(company)[self.returnCut:]
-        self.slopeFeatures = [self.stockHistory.nDaySlope(self.N, company, stat)[self.nDayCut:] for stat in self.statsToUse]
-        #self.volumeFeatures = [self.stockHistory.nDaySlope(self.N, company, VOLUME)
-    
+
+        self.nDaySlope = self.stockHistory.nDaySlope(self.N, company, OPEN)[self.nDayCut:]
+        self.nDayVolume = self.stockHistory.nDayAverage(self.N, company, VOLUME)[self.nDayCut:]
+        self.nDayOpenAverage = self.stockHistory.nDayAverage(self.N, company, OPEN)[self.nDayCut:]
+        self.nDayCloseAverage = self.stockHistory.nDayAverage(self.N, company, CLOSE)[self.nDayCut:]
+
+        self.numExamples = len(self.dates) - 1
+    """
+    def defineFeatures(self) :
+        features = []
+        # Add features for Monday thru Friday
+        for i in range(5) :
+            features.append(lambda pos : self.dates[pos].weekday() == i)
+        # Add features for previous numDaysOfHistory days
+        for i in range(Featurizer.numDaysOfHistory) :
+            features.append(lambda pos : self.returns[pos - i] > 0.025)
+
+        example.addFeature(self.nDaySlope[pos] > 0)
+        example.addFeature(self.nDaySlope[pos] < 0)
+        example.addFeature(self.nDaySlope[pos] > self.slopePos)
+        example.addFeature(self.nDaySlope[pos] < self.slopeNeg)
+
+        # figure out good values for these
+        example.addFeature(self.open[pos] > self.nDayOpenAverage[pos])
+        example.addFeature(self.open[pos] < self.nDayOpenAverage[pos])
+
+        # figure out good values for these
+        #example.addFeature(self.close[pos] > self.nDayCloseAverage[pos])
+        #example.addFeature(self.close[pos] < self.nDayCloseAverage[pos])
+
+        # figure out good values for these
+        example.addFeature(self.volume[pos] > self.nDayVolume[pos])
+        example.addFeature(self.volume[pos] < self.nDayVolume[pos])
+
+        example.addFeature(self.volume[pos] > self.nDayVolume[pos] and self.nDaySlope[pos] > self.slopePos)
+    """
     def features(self, pos) :
         example = TrainingExample()
         date = self.dates[pos].weekday()
@@ -205,22 +243,38 @@ class Featurizer :
                 example.addFeature(0)
         # Add features for previous numDaysOfHistory days
         for i in range(Featurizer.numDaysOfHistory) :
-            example.addFeature(self.returns[pos + i] > 0)
-        for sFeature in self.slopeFeatures :
-            example.addFeature(sFeature[pos] > 0)
-            example.addFeature(sFeature[pos] < 0)
-            example.addFeature(sFeature[pos] > self.slopePos)
-            example.addFeature(sFeature[pos] < self.slopeNeg)
+            example.addFeature(self.returns[pos + i] > 0.025)
+
+        example.addFeature(self.nDaySlope[pos] > 0)
+        example.addFeature(self.nDaySlope[pos] < 0)
+        example.addFeature(self.nDaySlope[pos] > self.slopePos)
+        example.addFeature(self.nDaySlope[pos] < self.slopeNeg)
+
+        # figure out good values for these
+        example.addFeature(self.open[pos] > self.nDayOpenAverage[pos])
+        example.addFeature(self.open[pos] < self.nDayOpenAverage[pos])
+
+        # figure out good values for these
+        example.addFeature(self.close[pos] > self.nDayCloseAverage[pos])
+        example.addFeature(self.close[pos] < self.nDayCloseAverage[pos])
+
+        # figure out good values for these
+        example.addFeature(self.volume[pos] > self.nDayVolume[pos])
+        example.addFeature(self.volume[pos] < self.nDayVolume[pos])
+
+        example.addFeature(self.volume[pos] > self.nDayVolume[pos] and self.nDaySlope[pos] > self.slopePos)
+
+        # Neural net output features
         if self.net != None :
             netOutput = [int(round(x)) for x in list(self.net.activate(example.features))]
             for netOut in netOutput :
                 example.addFeature(netOut)
-        example.addOutput(self.averages[pos] > self.averages[pos+1])
-        example.addOutput(self.averages[pos] < self.averages[pos+1])
+        example.addOutput(self.average[pos] > self.average[pos+1])
+        example.addOutput(self.average[pos] < self.average[pos+1])
         return example
     
     def parseArgs(self, args) :
-        self.statsToUse = [OPEN]
+        self.stat = OPEN
         self.N = 5
         self.slopePos = 1.5
         self.slopeNeg = -self.slopePos
@@ -233,24 +287,21 @@ class Featurizer :
             if i == 2 :
                 self.slopeNeg = float(arg)
             if i == 3 :
-                self.statsToUse = []
-                for char in arg.lower() :
-                    if char == 'o' :
-                        self.statsToUse.append(OPEN)
-                    elif char == 'h' :
-                        self.statsToUse.append(HIGH)
-                    elif char == 'l' :
-                        self.statsToUse.append(LOW)
-                    elif char == 'c' :
-                        self.statsToUse.append(CLOSE)
-                    elif char == 'v' :
-                        self.statsToUse.append(VOLUME)
+                s = arg.lower()
+                if s == 'o' :
+                    self.stat = OPEN
+                elif s == 'h' :
+                    self.stat = HIGH
+                elif s == 'l' :
+                    self.stat = LOW
+                elif s == 'c' :
+                    self.stat = CLOSE
             if i == 4 :
                 break # no more args
         print 'N:', self.N
         print 'slopePos:', self.slopePos
         print 'slopeNeg:', self.slopeNeg
-        print 'Using stats:', self.statsToUse
+        print 'Using stats:', self.stat
 
 class TrainingSet :
     def __init__(self, featurizer, company) :

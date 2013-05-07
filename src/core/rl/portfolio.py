@@ -6,15 +6,17 @@ from core.util.data import StockHistory, TrainingSet, Featurizer
 
 class Portfolio(object):
 
-    def __init__(self, testSize=0.2, pickNum=5, money=10000.0, verbose = False):
+    def __init__(self, testSize=0.2, pickNum=5, money=10000.0, verbose = False, netFname=None):
         self.stockHistory = StockHistory('nasdaq100')
         self.companies = self.stockHistory.compNames()
         self.featurizer = Featurizer(self.stockHistory)
+        if netFname != None :
+            self.featurizer.loadNN(netFname)
 
         self.A = dict()
         self.b = dict()
         self.alpha = 1
-        self.stockCost = 0.005
+        self.tradeCost = 0.01
         self.testPercentage = float(testSize)
         self.numToPick = int(pickNum)
         self.startMoney = float(money)
@@ -27,7 +29,7 @@ class Portfolio(object):
         return ((CAGR - 1) * 100)
 
     def updateMoney(self, money, stockReturn, cost):
-        #cost = (self.stockCost * 2 * self.numToPick)
+        #cost = (self.tradeCost * 2 * self.numToPick)
         profit = money * stockReturn
         money = money + profit - cost if money > 0 else 0
         return money
@@ -37,16 +39,15 @@ class Portfolio(object):
         cost = 0
         for stock in stocks:
             price = openPrices[stock]
-            cost += ((perStockMoney / price) * self.stockCost * 2)
+            cost += ((perStockMoney / price) * self.tradeCost * 2)
         return cost
 
-    def printData(self, trainSet, totalSet, realMoney, randomMoney, avgMoney, bestMoney):
+    def printData(self, trainSet, totalSet, realMoney, randomMoney, avgMoney):
         years = (totalSet - trainSet) / 250.8
         print 'Training days:', trainSet, 'Testing days:', (totalSet - trainSet), 'Total days:', totalSet
         print ('%-14s %14f %2.2f') % ('Real Money:', realMoney, self.CAGR(realMoney, years))
         print ('%-14s %14f %2.2f') % ('Random Money:', randomMoney, self.CAGR(randomMoney, years))
         print ('%-14s %14f %2.2f') % ('Average Money:', avgMoney, self.CAGR(avgMoney, years))
-        print ('%-14s %14f %2.2f') % ('Best Money:', bestMoney, self.CAGR(bestMoney, years))
 
     def run(self):
         # get data
@@ -70,7 +71,6 @@ class Portfolio(object):
         realMoney = self.startMoney
         randomMoney = self.startMoney
         avgMoney = self.startMoney
-        bestMoney = self.startMoney
         # loop until out of training data
         while flag:
             # get features and rewards
@@ -90,17 +90,16 @@ class Portfolio(object):
             flag = len(trainingSets.keys()) != 0
             # call LinUCB
             if flag:
-                stocks, stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio = self.LinUCB(companies, features, rewards, self.numToPick)
+                stocks, stockReturn, randomReturn, avgReturn, sharpeRatio = self.LinUCB(companies, features, rewards, self.numToPick)
                 if self.verbose:
-                    print stockReturn, randomReturn, avgReturn, bestReturn, sharpeRatio, stocks
+                    print stockReturn, randomReturn, avgReturn, sharpeRatio, stocks
                 count += 1
                 if count > testStart:
                     cost = self.getTradeCost(realMoney, stocks, openPrices)
                     realMoney = self.updateMoney(realMoney, stockReturn, cost)
                     randomMoney = self.updateMoney(randomMoney, randomReturn, cost)
                     avgMoney = self.updateMoney(avgMoney, avgReturn, cost)
-                    bestMoney = self.updateMoney(bestMoney, bestReturn, cost)
-        self.printData(testStart, count, realMoney, randomMoney, avgMoney, bestMoney)
+        self.printData(testStart, count, realMoney, randomMoney, avgMoney)
 
     def LinUCB(self, stocks, features, rewards, numberOfStocksToPick):
         p = []
@@ -143,10 +142,9 @@ class Portfolio(object):
 
         avgReturn = sum(rewards) / len(rewards)
         rewards.sort()
-        bestReturn = sum(rewards[::-1][:numberOfStocksToPick])
 
         chosenStocks, chosenFeatures, chosenRewards = zip(*chosen)
-        return chosenStocks, (stockReturn/numberOfStocksToPick), (randomReturn/numberOfStocksToPick), avgReturn, (bestReturn/numberOfStocksToPick), sharpeRatio
+        return chosenStocks, (stockReturn/numberOfStocksToPick), (randomReturn/numberOfStocksToPick), avgReturn, sharpeRatio
 
 def runPortfolio(*args):
     portfolio = Portfolio(*args)
