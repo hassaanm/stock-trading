@@ -23,15 +23,15 @@ def main() :
 def main2() :
     args = sys.argv[1:]
     stockHistory = StockHistory('nasdaq100')
-    featurizer = Featurizer(stockHistory, *args)
+    featurizer = Featurizer(stockHistory)
     numDaysHistory=range(2, 11)
     slopeN=range(2, 11)
     averageN=range(2, 11)
     returnThreshold=[0.025 * i for i in range(-4, 5)]
     slopePos=[0.5 * i for i in range(1, 10)]
     slopeNeg=[-0.5 * i for i in range(1, 10)]
-    stats=[]
-    runPortfolio(stockHistory, featurizer)
+    stats=['o', 'c', 'ov', 'cv', 'ocv', '']
+    runPortfolio(stockHistory, featurizer, *args)
     
 def usage() :
     print "That's not how you use this script!"

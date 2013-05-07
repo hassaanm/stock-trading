@@ -23,7 +23,7 @@ class Portfolio(object):
 
         self.A = dict()
         self.b = dict()
-        self.alpha = 1
+        self.alpha = 0.1
         self.tradeCost = 0.01
         self.testPercentage = float(testSize)
         self.numToPick = int(pickNum)
