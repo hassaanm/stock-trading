@@ -13,7 +13,7 @@ def trainNN(args) :
     print 'Reading data'
     stockHistory = StockHistory('nasdaq100')
     companies = stockHistory.compNames()
-    featurizer = Featurizer(stockHistory, *args)
+    featurizer = Featurizer(stockHistory, companies[0])
     nF = featurizer.numFeatures
     nO = featurizer.numTargetFeatures
     print
@@ -26,7 +26,7 @@ def trainNN(args) :
     correlations = [[0 for i in range(nO)] for j in range(nF)]
     numTrainingExamples = 0
     for company in companies :
-        trainingSet = TrainingSet(featurizer, company)
+        trainingSet = TrainingSet(stockHistory, company)
         for trainingExample in trainingSet :
             features = trainingExample.features
             output = trainingExample.output

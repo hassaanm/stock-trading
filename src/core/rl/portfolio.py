@@ -20,7 +20,7 @@ class Portfolio(object):
         self.verbose = int(verbose)
         featurizer = Featurizer(self.stockHistory, self.companies[0])
         self.numberOfFeatures = featurizer.numFeatures
-        self.cut = featurizer.cut
+        self.cut = featurizer.cut + 1
 
     def CAGR(self, endMoney, years):
         totalReturn = endMoney / float(self.startMoney)
@@ -39,7 +39,7 @@ class Portfolio(object):
         for stock in stocks:
             price = openPrices[stock]
             cost += ((perStockMoney / price) * self.tradeCost * 2)
-        return 7*2*self.numToPick
+        return cost
 
     def printData(self, trainSet, totalSet, realMoney, randomMoney, avgMoney):
         years = (totalSet - trainSet) / 250.8
