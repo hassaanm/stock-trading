@@ -16,8 +16,9 @@ def main() :
     elif method == 'testNN' :
         testNN(args)
     elif method == 'rl' :
-        # number of stocks to choose, test set percentage, starting money amount
-        runPortfolio(int(args[0]), float(args[1]), float(args[2]), int(args[3]))
+        # number of stocks to choose, test set percentage, starting money amount, optional verbose
+        verbose = int(args[3]) if len(args) > 3 else 0
+        runPortfolio(int(args[0]), float(args[1]), float(args[2]), verbose)
     
     
 def usage() :
