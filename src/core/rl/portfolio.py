@@ -129,4 +129,4 @@ class Portfolio(object):
 
 def runPortfolio(stockHistory=None, featurizer=None, *args):
     portfolio = Portfolio(stockHistory, featurizer, *args)
-    portfolio.run()
+    return portfolio.run()

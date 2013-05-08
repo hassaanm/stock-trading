@@ -2,6 +2,7 @@
 
 from core.nn.neuralnet import *
 from core.rl.portfolio import runPortfolio
+from core.rl.policyGradient import policyGradient
 from core.util.data import StockHistory
 import sys
 
@@ -21,17 +22,11 @@ def main() :
         runPortfolio(*args)
     
 def main2() :
-    args = sys.argv[1:]
     stockHistory = StockHistory('nasdaq100')
     featurizer = Featurizer(stockHistory)
-    numDaysHistory=range(2, 11)
-    slopeN=range(2, 11)
-    averageN=range(2, 11)
-    returnThreshold=[0.025 * i for i in range(-4, 5)]
-    slopePos=[0.5 * i for i in range(1, 10)]
-    slopeNeg=[-0.5 * i for i in range(1, 10)]
-    stats=['o', 'c', 'ov', 'cv', 'ocv', '']
-    runPortfolio(stockHistory, featurizer, *args)
+    initialArgs = [5, 5, 5, 0, 1.5, -1.5]
+    epsilons = [1, 1, 1, 0.01, 0.1, 0.1]
+    policyGradient(initialArgs, epsilons)
     
 def usage() :
     print "That's not how you use this script!"

@@ -129,9 +129,9 @@ class StockHistory :
 class Featurizer :
     def __init__(self, stockHistory, numDaysHistory=5, slopeN=5, averageN=5, returnThreshold=0, slopePos=1.5, slopeNeg=-1.5, stats=None) :
         self.stockHistory = stockHistory
-        self.numDaysHistory = numDaysHistory
-        self.slopeN = slopeN
-        self.averageN = averageN
+        self.numDaysHistory = numDaysHistory if numDaysHistory > 0 else 0
+        self.slopeN = slopeN if slopeN > 0 else 0
+        self.averageN = averageN if averageN > 0 else 0
         self.returnThreshold = returnThreshold
         self.slopePos = slopePos
         self.slopeNeg = slopeNeg
