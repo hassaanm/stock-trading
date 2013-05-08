@@ -9,7 +9,7 @@ from core.util.data import StockHistory, Featurizer, OPEN
 
 class Portfolio(object):
 
-    def __init__(self, stockHistory=None, featurizer=None, testSize=0.2, pickNum=5, money=10000.0, verbose = False):
+    def __init__(self, stockHistory=None, featurizer=None, testSize=0.2, pickNum=5, money=10000.0, verbose=False, graph=False):
         if stockHistory == None :
             self.stockHistory = StockHistory('nasdaq100')
         else :
@@ -29,6 +29,7 @@ class Portfolio(object):
         self.numToPick = int(pickNum)
         self.startMoney = float(money)
         self.verbose = int(verbose)
+        self.graph = int(graph)
 
     # compound annual growth rate
     def CAGR(self, endMoney, years):

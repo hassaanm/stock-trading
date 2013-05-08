@@ -164,15 +164,19 @@ class Featurizer :
             features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > self.returnThreshold)(i))
 
         for stat in self.stats :
-            features.append((lambda x: lambda comp, date : self.stockHistory.getPrev(comp, date, x) > self.stockHistory.nDayAverage(self.averageN, comp, date, x))(stat))
-            features.append((lambda x: lambda comp, date : self.stockHistory.getPrev(comp, date, x) < self.stockHistory.nDayAverage(self.averageN, comp, date, x))(stat))
-            features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) > 0)(stat))
-            features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) < 0)(stat))
-            features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) > self.slopePos)(stat))
-            features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) < self.slopeNeg)(stat))
+            if self.averageN > 0:
+                features.append((lambda x: lambda comp, date : self.stockHistory.getPrev(comp, date, x) > self.stockHistory.nDayAverage(self.averageN, comp, date, x))(stat))
+                features.append((lambda x: lambda comp, date : self.stockHistory.getPrev(comp, date, x) < self.stockHistory.nDayAverage(self.averageN, comp, date, x))(stat))
+            if self.slopeN > 0:
+                features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) > 0)(stat))
+                features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) < 0)(stat))
+                features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) > self.slopePos)(stat))
+                features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) < self.slopeNeg)(stat))
 
-        features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, VOLUME) > self.stockHistory.nDayAverage(self.averageN, comp, date, VOLUME) \
-            and self.stockHistory.getPrev(comp, date, OPEN) > self.stockHistory.nDayAverage(self.averageN, comp, date, OPEN))
+        if self.averageN > 0:
+            features.append(lambda comp, date : self.stockHistory.getPrev(comp, date, VOLUME) > self.stockHistory.nDayAverage(self.averageN, comp, date, VOLUME) \
+                and self.stockHistory.getPrev(comp, date, OPEN) > self.stockHistory.nDayAverage(self.averageN, comp, date, OPEN))
+        
         self.featureFunctions = features
 
     def getFeatures(self, comp, date) :

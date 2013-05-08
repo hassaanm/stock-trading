@@ -14,6 +14,8 @@ def policyGradient(initialArgs, argEpsilons, T=5, maxStaticRewards=10, maxShift=
     while numStaticRewards < maxStaticRewards and iteration < maxIterations :
         iteration += 1
         randomPerturbations = [[randint(-maxShift, maxShift)*epsilon+arg for (arg,epsilon) in zip(currentArgs, argEpsilons)] for t in range(T)]
+        for perturbation in randomPerturbations :
+            print 'Trying args:', perturbation
         #changes = [[-1 if arg1 < arg2 else 1 if arg1 > arg2 else 0 for (arg1, arg2) in zip(randomArgs, currentArgs)] for randomArgs in randomPerturbations]
         featurizers = [Featurizer(stockHistory, *args) for args in randomPerturbations]
         results = [runPortfolio(stockHistory, featurizer) for featurizer in featurizers]
