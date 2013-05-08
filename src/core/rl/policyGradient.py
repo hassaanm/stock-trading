@@ -2,13 +2,16 @@ from random import randint
 from core.util.data import StockHistory, Featurizer
 from core.rl.portfolio import runPortfolio
 
-def policyGradient(initialArgs, argEpsilons, T=5, maxStaticRewards=10, maxShift=3, maxIterations=1000) :
+def policyGradient(initialArgs, argEpsilons, T=5, maxStaticRewards=10, maxShift=5, maxIterations=1000, testPercent=0.4) :
     done = False
     stockHistory = StockHistory('nasdaq100')
     currentArgs = initialArgs
-    currentMax = runPortfolio(stockHistory, Featurizer(stockHistory, *currentArgs))
+    currentMax = runPortfolio(stockHistory, Featurizer(stockHistory, *currentArgs), testPercent)
     print
     print 'Initial reward:', currentMax
+    f = open('maxArg.txt', 'a')
+    f.write('Begin again! Excited!!!\n')
+    f.close()
     numStaticRewards = 0
     iteration = 0
     while numStaticRewards < maxStaticRewards and iteration < maxIterations :
@@ -18,7 +21,7 @@ def policyGradient(initialArgs, argEpsilons, T=5, maxStaticRewards=10, maxShift=
             print 'Trying args:', perturbation
         #changes = [[-1 if arg1 < arg2 else 1 if arg1 > arg2 else 0 for (arg1, arg2) in zip(randomArgs, currentArgs)] for randomArgs in randomPerturbations]
         featurizers = [Featurizer(stockHistory, *args) for args in randomPerturbations]
-        results = [runPortfolio(stockHistory, featurizer) for featurizer in featurizers]
+        results = [runPortfolio(stockHistory, featurizer, testPercent) for featurizer in featurizers]
 
         """
         less = [[] for i in range(T)]

@@ -127,12 +127,13 @@ class StockHistory :
         return nReturn
 
 class Featurizer :
-    def __init__(self, stockHistory, numDaysHistory=5, slopeN=5, averageN=5, returnThreshold=0, slopePos=1.5, slopeNeg=-1.5, stats=None) :
+    def __init__(self, stockHistory, numDaysHistory=5, slopeN=5, averageN=5, returnPos=0.05, returnNeg=-0.05, slopePos=1.5, slopeNeg=-1.5, stats=None) :
         self.stockHistory = stockHistory
         self.numDaysHistory = numDaysHistory if numDaysHistory > 0 else 0
         self.slopeN = slopeN if slopeN > 0 else 0
         self.averageN = averageN if averageN > 0 else 0
-        self.returnThreshold = returnThreshold
+        self.returnPos = returnPos
+        self.returnNeg = returnNeg
         self.slopePos = slopePos
         self.slopeNeg = slopeNeg
         self.startDates = {}
@@ -161,7 +162,10 @@ class Featurizer :
             features.append((lambda x: lambda comp, date : date.weekday() == x)(i))
         # Add features for previous numDaysHistory days
         for i in range(1, self.numDaysHistory+1) :
-            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > self.returnThreshold)(i))
+            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > 0)(i))
+            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) < 0)(i))
+            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > self.returnPos)(i))
+            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) < self.returnNeg)(i))
 
         for stat in self.stats :
             if self.averageN > 0:

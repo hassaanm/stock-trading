@@ -24,8 +24,8 @@ def main() :
 def main2() :
     stockHistory = StockHistory('nasdaq100')
     featurizer = Featurizer(stockHistory)
-    initialArgs = [5, 5, 5, 0, 1.5, -1.5]
-    epsilons = [1, 1, 1, 0.01, 0.1, 0.1]
+    initialArgs = [5, 5, 5, 0.05, -0.05, 1.5, -1.5]
+    epsilons = [1, 1, 1, 0.01, 0.01, 0.1, 0.1]
     policyGradient(initialArgs, epsilons)
     
 def usage() :
