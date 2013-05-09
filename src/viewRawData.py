@@ -4,45 +4,25 @@ import sys
 from core.util import data
 from core.util.graphics import plot, plotDistribution
 
-dataSet = sys.argv[1]
-companiesToGraph = sys.argv[2:]
-stockHistory = data.StockHistory(dataSet)
+companiesToGraph = sys.argv[1:]
+sh = data.StockHistory('nasdaq100')
 
 if len(companiesToGraph) > 0 :
     print 'Generating graphs.'
 for compName in companiesToGraph :
     compName = compName.upper()
-    if not stockHistory.hasCompanyData(compName) :
+    if not sh.hasComp(compName) :
         print 'No data for company', compName
         continue
-    openYs = stockHistory.getData(compName, data.OPEN)
-    highYs = stockHistory.getData(compName, data.HIGH)
-    lowYs = stockHistory.getData(compName, data.LOW)
-    closeYs = stockHistory.getData(compName, data.CLOSE)
+    allDates = sh.getAllDates(compName)
+    openYs = [sh.get(compName, date, data.OPEN) for date in allDates]
+    highYs = [sh.get(compName, date, data.HIGH) for date in allDates]
+    lowYs = [sh.get(compName, date, data.LOW) for date in allDates]
+    closeYs = [sh.get(compName, date, data.CLOSE) for date in allDates]
     plot([openYs, highYs, lowYs, closeYs],
         labels=['Open', 'High', 'Low', 'Close'],
         title=compName,
         xlabel='Time',
         ylabel='Stock Price')
-"""
-sharpeRatios = []
-for comp in stockHistory.compNames() :
-    sharpeRatios += stockHistory.nDaySharpeRatio(5, comp, data.OPEN)
-plotDistribution(sharpeRatios, -7, -1)
 
-sharpeRatios = []
-for comp in stockHistory.compNames() :
-    sharpeRatios += stockHistory.nDaySharpeRatio(10, comp, data.OPEN)
-plotDistribution(sharpeRatios, -7, 0)
-
-sharpeRatios = []
-for comp in stockHistory.compNames() :
-    sharpeRatios += stockHistory.nDaySharpeRatio(25, comp, data.OPEN)
-plotDistribution(sharpeRatios, -7, 1)
-
-sharpeRatios = []
-for comp in stockHistory.compNames() :
-    sharpeRatios += stockHistory.nDaySharpeRatio(100, comp, data.OPEN)
-plotDistribution(sharpeRatios, -7, 1)
-"""
 print 'Done.'

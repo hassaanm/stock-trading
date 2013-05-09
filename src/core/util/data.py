@@ -82,11 +82,17 @@ class StockHistory :
     def compNames(self) :
         return self.data.keys()
 
+    def hasComp(self, comp) :
+        return comp in self.data
+
     def hasDate(self, comp, date) :
         return date in self.data[comp]
 
+    def getAllDates(self, comp) :
+        return sorted(self.data[comp].keys())
+
     def getFirstDate(self, comp) :
-        return sorted(self.data[comp].keys())[0]
+        return self.getAllDates(comp)[0]
 
     def getNDaysAgo(self, n, comp, date) :
         while n != 0 :
@@ -127,13 +133,12 @@ class StockHistory :
         return nReturn
 
 class Featurizer :
-    def __init__(self, stockHistory, numDaysHistory=5, slopeN=5, averageN=5, returnPos=0.05, returnNeg=-0.05, slopePos=1.5, slopeNeg=-1.5, stats=None) :
+    def __init__(self, stockHistory, numDaysHistory=5, slopeN=5, averageN=5, returnThreshold=0.02, slopePos=1.5, slopeNeg=-1.5, stats=None) :
         self.stockHistory = stockHistory
         self.numDaysHistory = numDaysHistory if numDaysHistory > 0 else 0
         self.slopeN = slopeN if slopeN > 0 else 0
         self.averageN = averageN if averageN > 0 else 0
-        self.returnPos = returnPos
-        self.returnNeg = returnNeg
+        self.returnThreshold = returnThreshold
         self.slopePos = slopePos
         self.slopeNeg = slopeNeg
         self.startDates = {}
@@ -162,18 +167,14 @@ class Featurizer :
             features.append((lambda x: lambda comp, date : date.weekday() == x)(i))
         # Add features for previous numDaysHistory days
         for i in range(1, self.numDaysHistory+1) :
-            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > 0)(i))
-            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) < 0)(i))
-            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > self.returnPos)(i))
-            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) < self.returnNeg)(i))
+            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) > self.returnThreshold)(i))
+            features.append((lambda x: lambda comp, date : self.stockHistory.getReturn(x, comp, date) < self.returnThreshold)(i))
 
         for stat in self.stats :
             if self.averageN > 0:
                 features.append((lambda x: lambda comp, date : self.stockHistory.getPrev(comp, date, x) > self.stockHistory.nDayAverage(self.averageN, comp, date, x))(stat))
                 features.append((lambda x: lambda comp, date : self.stockHistory.getPrev(comp, date, x) < self.stockHistory.nDayAverage(self.averageN, comp, date, x))(stat))
             if self.slopeN > 0:
-                features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) > 0)(stat))
-                features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) < 0)(stat))
                 features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) > self.slopePos)(stat))
                 features.append((lambda x: lambda comp, date : self.stockHistory.nDaySlope(self.slopeN, comp, date, x) < self.slopeNeg)(stat))
 

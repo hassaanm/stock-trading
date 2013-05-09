@@ -5,7 +5,7 @@ try :
 except :
     pass
 
-def plot(yss, xss=None, labels=None, yerrs=None, title='', xlabel='', ylabel='', legendLoc=4, right=True, scale=False) :
+def plot(yss, xss=None, labels=None, yerrs=None, title='', xlabel='', ylabel='', legendLoc='upper left', right=True, scale=False) :
     if not graphing :
         print 'Graphing is not available'
         return

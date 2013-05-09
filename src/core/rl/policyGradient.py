@@ -1,14 +1,17 @@
 from random import randint
 from core.util.data import StockHistory, Featurizer
-from core.rl.portfolio import runPortfolio
+from core.rl.portfolio import evalLinUCB
 
-def policyGradient(initialArgs, argEpsilons, T=5, maxStaticRewards=10, maxShift=5, maxIterations=1000, testPercent=0.4) :
+def policyGradient(T=5, maxStaticRewards=10, maxShift=5, maxIterations=1000, alpha=0.1) :
     done = False
     stockHistory = StockHistory('nasdaq100')
-    currentArgs = initialArgs
-    currentMax = runPortfolio(stockHistory, Featurizer(stockHistory, *currentArgs), testPercent)
+    currentArgs = [5, 5, 5, 0, 1.5, -1.5]
+    argEpsilons = [1, 1, 1, 0.01, 0.1, 0.1]
+    CAGRs = evalLinUCB(stockHistory, Featurizer(stockHistory, *currentArgs), alpha=alpha)
+    currentMax = sum(CAGRs) / len(CAGRs)
     print
-    print 'Initial reward:', currentMax
+    print 'Initial CAGRs:', CAGRs
+    print 'Initial max:  ', currentMax
     f = open('maxArg.txt', 'a')
     f.write('Begin again! Excited!!!\n')
     f.close()
@@ -21,7 +24,7 @@ def policyGradient(initialArgs, argEpsilons, T=5, maxStaticRewards=10, maxShift=
             print 'Trying args:', perturbation
         #changes = [[-1 if arg1 < arg2 else 1 if arg1 > arg2 else 0 for (arg1, arg2) in zip(randomArgs, currentArgs)] for randomArgs in randomPerturbations]
         featurizers = [Featurizer(stockHistory, *args) for args in randomPerturbations]
-        results = [runPortfolio(stockHistory, featurizer, testPercent) for featurizer in featurizers]
+        results = [evalLinUCB(stockHistory, featurizer, alpha=alpha) for featurizer in featurizers]
 
         """
         less = [[] for i in range(T)]
@@ -51,7 +54,10 @@ def policyGradient(initialArgs, argEpsilons, T=5, maxStaticRewards=10, maxShift=
                 currentArgs[i] += argEpsilons[i]
         """
         numStaticRewards += 1
-        for (args, result) in zip(randomPerturbations, results) :
+        for (args, cagrs) in zip(randomPerturbations, results) :
+            print 'Args:  ', args
+            print 'CAGRs: ', cagrs
+            result = sum(cagrs) / len(cagrs)
             if result > currentMax :
                 currentMax = result
                 currentArgs = args
@@ -60,6 +66,6 @@ def policyGradient(initialArgs, argEpsilons, T=5, maxStaticRewards=10, maxShift=
         resultString = 'Iteration: ' + str(iteration) + ', Static Rewards: ' + str(numStaticRewards) + ', Current Max: ' + str(currentMax) + ', Args: ' + str(currentArgs)
         print
         print resultString
-        f = open('maxArg.txt', 'a')
+        f = open('maxArg_' + str(alpha) + '.txt', 'a')
         f.write(resultString + '\n')
         f.close()
