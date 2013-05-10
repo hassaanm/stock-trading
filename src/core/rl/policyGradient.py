@@ -2,9 +2,9 @@ from random import randint
 from core.util.data import StockHistory, Featurizer
 from core.rl.portfolio import evalLinUCB
 
-def policyGradient(T=5, maxStaticRewards=10, maxShift=5, maxIterations=1000, alpha=0.1) :
+def policyGradient(T=5, maxStaticRewards=10, maxShift=5, maxIterations=1000, alpha=0.1, dataSet='nasdaq100') :
     done = False
-    stockHistory = StockHistory('nasdaq100')
+    stockHistory = StockHistory(dataSet)
     currentArgs = [5, 5, 5, 0, 1.5, -1.5]
     argEpsilons = [1, 1, 1, 0.01, 0.1, 0.1]
     CAGRs = evalLinUCB(stockHistory, Featurizer(stockHistory, *currentArgs), alpha=alpha)

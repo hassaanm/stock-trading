@@ -4,8 +4,9 @@ import sys
 from core.util import data
 from core.util.graphics import plot, plotDistribution
 
-companiesToGraph = sys.argv[1:]
-sh = data.StockHistory('nasdaq100')
+folder = sys.argv[1]
+companiesToGraph = sys.argv[2:]
+sh = data.StockHistory(folder)
 
 if len(companiesToGraph) > 0 :
     print 'Generating graphs.'

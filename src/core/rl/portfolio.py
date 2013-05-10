@@ -7,7 +7,7 @@ from datetime import timedelta, date
 from core.util.data import StockHistory, Featurizer, OPEN
 from core.util.graphics import plot
 
-def evalLinUCB(stockHistory=None, featurizer=None, graph=0, verbose=0, pickNum=5, money=10000.0, tradeCost=0.01, alpha=0.1):
+def evalLinUCB(stockHistory=None, featurizer=None, dataSet='nasdaq100', graph=0, verbose=0, pickNum=5, money=10000.0, tradeCost=0.01, alpha=0.1):
     # sanitize input
     graph = int(graph)
     verbose = int(verbose)
@@ -17,7 +17,7 @@ def evalLinUCB(stockHistory=None, featurizer=None, graph=0, verbose=0, pickNum=5
     alpha = float(alpha)
 
     if stockHistory == None :
-        stockHistory = StockHistory('nasdaq100')
+        stockHistory = StockHistory(dataSet)
     if featurizer == None :
         featurizer = Featurizer(stockHistory)
 
@@ -35,7 +35,7 @@ def evalLinUCB(stockHistory=None, featurizer=None, graph=0, verbose=0, pickNum=5
     names = ['LinUCB', 'Random', 'PrevBest']
     numAgents = len(agents)
     agentReturns = [[] for i in range(numAgents)]
-    agentMoney = [[] for i in range(numAgents)]
+    agentTestMoney = [[] for i in range(numAgents)]
     testingDays = []    
 
     print
@@ -51,11 +51,12 @@ def evalLinUCB(stockHistory=None, featurizer=None, graph=0, verbose=0, pickNum=5
         features = [featurizer.getFeatures(company, currentDate) for company in companies]
         returns = [stockHistory.getReturn(0, company, currentDate) for company in companies]
         if len(companies) > 0 :
-            for agent, allReturns, allMoney in zip(agents, agentReturns, agentMoney) :
+            for agent, allReturns, allMoney in zip(agents, agentReturns, agentTestMoney) :
                 chosenStocks, avgReturn, sharpeRatio = agent.select(companies, features, returns)
                 allReturns.append(avgReturn)
                 openPrices = {company: stockHistory.get(company, currentDate, OPEN) for company in companies}
                 money = agent.updateMoney(currentDate, chosenStocks, openPrices, avgReturn)
+                allMoney.append(money)
                 #if currentDate > testStartDate:
                 #    testingDays.append(currentDate)
                 #    allMoney.append(money)
@@ -68,7 +69,11 @@ def evalLinUCB(stockHistory=None, featurizer=None, graph=0, verbose=0, pickNum=5
     if graph :
         totalReturns = [[sum(returns[:i]) for i in range(len(returns))] for returns in agentReturns]
         plot(totalReturns, labels=names, ylabel='Total Return', xlabel='Time (Days)')
-        plot(agentMoney, labels=names, ylabel='Total Money', xlabel='Time (Days)')
+        for i in range(len(testSizes)) :
+            yss = []
+            for testMoney in agentTestMoney :
+                yss.append([m[i] for m in testMoney if m[i] != 10000])
+            plot(yss, labels=names, ylabel='Total Money', xlabel='Time (Days)')
     CAGRs = [agent.CAGRs(endDate) for agent in agents]
     #print 'Training days:', (testStartDate - startDate).days, 'Testing days:', (endDate - testStartDate).days, 'Total days:', (endDate - startDate).days
     for agent, name, cagr in zip(agents, names, CAGRs) :
@@ -166,7 +171,7 @@ class LinUCBAgent (Agent) :
 
 class RandomAgent (Agent) :
     def select(self, stocks, features, rewards):
-        selections = random.sample(zip(stocks, rewards), self.numToPick)
+        selections = random.sample(zip(stocks, rewards), min(len(stocks), self.numToPick))
         chosenStocks = [sel[0] for sel in selections]
         chosenRewards = [sel[1] for sel in selections]
         avgStockReturn = self.averageReturn(chosenRewards)
@@ -180,7 +185,7 @@ class PrevBestAgent (Agent) :
 
     def select(self, stocks, features, rewards):
         if self.prevRewards == None :
-            selections = random.sample(zip(stocks, rewards), self.numToPick)
+            selections = random.sample(zip(stocks, rewards), min(len(stocks), self.numToPick))
             chosenStocks = [sel[0] for sel in selections]
             chosenRewards = [sel[1] for sel in selections]
         else :

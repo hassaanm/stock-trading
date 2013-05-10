@@ -36,6 +36,8 @@ def window(seq, n=2):
 class StockHistory :
     stats = AVAILABLE_STATS
     def __init__(self, dirName) :
+        self.noData = []
+        self.incomplete = []
         self.path = os.path.dirname(os.path.realpath(__file__)) + '/../../../data/' + dirName
         files = [f for f in os.listdir(self.path) if 'json' in f]
         print 'Reading files in', dirName
@@ -48,9 +50,11 @@ class StockHistory :
                 quotes = json.loads(f.read())['query']['results']['quote']
             except :
                 print 'No data:', fName
+                self.noData.append(fName)
                 continue
             quotes.reverse()
-            if len(quotes) < 250 :
+            if len(quotes) < 245 :
+                self.incomplete.append(fName)
                 print 'Incomplete data:', fName, len(quotes)
             parts = fName.split('.')
             compName = parts[0]
@@ -133,7 +137,7 @@ class StockHistory :
         return nReturn
 
 class Featurizer :
-    def __init__(self, stockHistory, numDaysHistory=5, slopeN=5, averageN=5, returnThreshold=0.02, slopePos=1.5, slopeNeg=-1.5, stats=None) :
+    def __init__(self, stockHistory, numDaysHistory=2, slopeN=2, averageN=5, returnThreshold=-0.04, slopePos=1.2, slopeNeg=-1.8, stats=None) :
         self.stockHistory = stockHistory
         self.numDaysHistory = numDaysHistory if numDaysHistory > 0 else 0
         self.slopeN = slopeN if slopeN > 0 else 0
